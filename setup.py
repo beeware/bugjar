@@ -28,7 +28,10 @@ setup(
         'bugjar',
     ],
     install_requires=required_pkgs,
-    scripts=['scripts/bugjar'],
+    scripts=[],
+    entry_points={
+        'console_scripts': ['bugjar = bugjar.__main__:main']
+    },
     license='New BSD',
     classifiers=[
         'Development Status :: 4 - Beta',
