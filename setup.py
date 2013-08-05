@@ -30,7 +30,10 @@ setup(
     install_requires=required_pkgs,
     scripts=[],
     entry_points={
-        'console_scripts': ['bugjar = bugjar.jar:main']
+        'console_scripts': [
+            'bugjar = bugjar.jar:local',
+            'bugjar-remote = bugjar.jar:remote'
+        ]
     },
     license='New BSD',
     classifiers=[

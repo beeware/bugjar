@@ -59,8 +59,6 @@ class Debugger(bdb.Bdb):
     STARTED = 2
 
     ETX = '\x03'
-    EOT = '\x04'
-    EOH = '\x05'
 
     def __init__(self, socket, host, port, skip=None):
         bdb.Bdb.__init__(self, skip=skip)
@@ -72,16 +70,13 @@ class Debugger(bdb.Bdb):
         self.port = port
         self.client = None
 
-    def output(self, msg_type, **data):
+    def output(self, event, **data):
         try:
-            msg = {
-                'type': msg_type
-            }
-            msg.update(data)
-            print "OUTPUT %s byte message" % len(json.dumps(msg) + Debugger.EOH)
-            self.client.sendall(json.dumps(msg) + Debugger.EOH)
-        except socket.error:
-            print "CLIENT ERROR"
+            print "OUTPUT %s byte message" % len(json.dumps((event, data)) + Debugger.ETX)
+            self.client.sendall(json.dumps((event, data)) + Debugger.ETX)
+        except socket.error, e:
+            traceback.print_exc
+            print "CLIENT ERROR", e
         except AttributeError:
             print "No client yet"
 
@@ -121,6 +116,7 @@ class Debugger(bdb.Bdb):
             if (self.mainpyfile != self.canonic(frame.f_code.co_filename) or frame.f_lineno <= 0):
                 return
             self._run_state = Debugger.STARTED
+        self.output('line', filename=os.path.basename(frame.f_code.co_filename), line=frame.f_lineno)
         self.interaction(frame, None)
 
     def user_return(self, frame, return_value):
@@ -154,11 +150,6 @@ class Debugger(bdb.Bdb):
                 print "Update initial client state..."
                 self.print_stack_entry(self.stack[self.curindex])
 
-                print "Tell client we're ready for input..."
-                # Send ETX to indicate the end of output that
-                # the server will provide, prompting the client
-                # for input.
-                self.client.sendall(Debugger.ETX)
                 print "Wait for input..."
                 data = self.client.recv(4096)
                 args = data.split(' ', 1)
@@ -538,8 +529,6 @@ class Debugger(bdb.Bdb):
     def do_quit(self, arg):
         self._user_requested_quit = True
         self.set_quit()
-        # Send EOT to terminate debug session
-        self.client.sendall(Debugger.EOT)
         return 1
 
     def do_args(self, arg):
@@ -733,7 +722,7 @@ def main():
             break
 
     if debugger.client:
-        print "lost connection... closing"
+        print "closing connection"
         debugger.client.shutdown(socket.SHUT_WR)
 
 if __name__ == '__main__':

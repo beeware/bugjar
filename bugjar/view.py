@@ -1,4 +1,4 @@
-"""A module containing a visual representation of the debugger
+"""A module containing a visual representation of the connection
 
 This is the "View" of the MVC world.
 """
@@ -9,10 +9,11 @@ from ttk import *
 import tkMessageBox
 
 from bugjar.widgets import ReadOnlyCode
+from bugjar.connection import Debugger
 
 
 class MainWindow(object):
-    def __init__(self, root):
+    def __init__(self, root, connection):
         '''
         -----------------------------------------------------
         | main button toolbar                               |
@@ -29,6 +30,8 @@ class MainWindow(object):
         -----------------------------------------------------
 
         '''
+
+        self.connection = connection
 
         # Root window
         self.root = root
@@ -57,11 +60,51 @@ class MainWindow(object):
         self.root.rowconfigure(2, weight=0)
 
         # FIXME - set up some initial content.
-        self.show_file('/Users/rkm/projects/beeware/bugjar/bugjar/view.py')
+        # self.show_file('/Users/rkm/projects/beeware/bugjar/bugjar/view.py')
 
         self.stack_list.insert('', 'end', text='file1.py', values=('123',))
 
         self.breakpoint_list.insert('', 'end', text='breakpoint1.py', values=('456',))
+
+        connection.start()
+        print "STARTED"
+        # Queue the first progress handling event
+        # self.root.after(100, self.on_progress)
+
+        Debugger.bind('stack', self.on_stackUpdate)
+        Debugger.bind('line', self.on_line)
+        Debugger.bind('call', self.on_call)
+        Debugger.bind('return', self.on_return)
+        Debugger.bind('exception', self.on_exception)
+        Debugger.bind('restart', self.on_restart)
+
+    def on_stackUpdate(self, source, stack):
+        print "STACK UPDATE FOUND"
+        if len(stack) > 0:
+            print stack[-1][0], stack[-1][1]['filename']
+            self.show_file(stack[-1][1]['filename'], line=stack[-1][0])
+        else:
+            # No current frame (probably end of execution),
+            # so clear the current line marker
+            self.set_current_line(None)
+
+    def on_line(self, source, filename, line):
+        self.run_status.set('Line (%s:%s)' % (filename, line))
+
+    def on_call(self, source, args):
+        self.run_status.set('Call: %s' % args)
+
+    def on_return(self, source, retval):
+        self.run_status.set('Return: %s' % retval)
+
+    def on_exception(self, source, **kwargs):
+        print "EXCEPTION FOUND"
+        print kwargs
+        self.run_status.set('Exception')
+
+    def on_restart(self, source):
+        self.run_status.set('Not running')
+        tkMessageBox.showinfo(message='Program has finished, and will restart.')
 
     ######################################################
     # Internal GUI layout methods.
@@ -109,20 +152,17 @@ class MainWindow(object):
         self.toolbar.grid(column=0, row=0, sticky=(W, E))
 
         # Buttons on the toolbar
-        self.run_stop_button = Button(self.toolbar, text='Run', command=self.cmd_run_stop)
-        self.run_stop_button.grid(column=0, row=0)
+        self.run_button = Button(self.toolbar, text='Run', command=self.cmd_run)
+        self.run_button.grid(column=0, row=0)
 
-        self.continue_button = Button(self.toolbar, text='Continue', state=DISABLED, command=self.cmd_continue)
-        self.continue_button.grid(column=1, row=0)
+        self.step_button = Button(self.toolbar, text='Step', command=self.cmd_step)
+        self.step_button.grid(column=1, row=0)
 
-        self.step_button = Button(self.toolbar, text='Step', state=DISABLED, command=self.cmd_step)
-        self.step_button.grid(column=2, row=0)
+        self.next_button = Button(self.toolbar, text='Next', command=self.cmd_next)
+        self.next_button.grid(column=2, row=0)
 
-        self.next_button = Button(self.toolbar, text='Next', state=DISABLED, command=self.cmd_next)
-        self.next_button.grid(column=3, row=0)
-
-        self.return_button = Button(self.toolbar, text='Return', state=DISABLED, command=self.cmd_return)
-        self.return_button.grid(column=4, row=0)
+        self.return_button = Button(self.toolbar, text='Return', command=self.cmd_return)
+        self.return_button.grid(column=3, row=0)
 
         self.toolbar.columnconfigure(0, weight=0)
         self.toolbar.rowconfigure(0, weight=0)
@@ -222,10 +262,26 @@ class MainWindow(object):
     ######################################################
 
     def show_file(self, filename, line=None, breakpoints=None, refresh=False):
+        """Show the content of the nominated file.
+
+        If specified, line is the current line number to highlight. If the
+        line isn't currently visible, the window will be scrolled until it is.
+
+        breakpoints is a list of line numbers that have current breakpoints.
+
+        If refresh is true, the file will be reloaded and redrawn.
+        """
         path, name = os.path.split(filename)
 
         self.current_file.set('%s (%s)' % (name, path))
-        self.code.show(filename)
+        self.code.show(filename, line=line)
+
+    def set_current_line(self, line):
+        """Highlight a specific line of the current file.
+
+        If line==None, the current line marker will be removed.
+        """
+        self.show_file(self.code.current_file, line=line)
 
     ######################################################
     # TK Main loop
@@ -234,20 +290,24 @@ class MainWindow(object):
     def mainloop(self):
         self.root.mainloop()
 
+    ######################################################
+    # TK Command handlers
+    ######################################################
+
     def on_quit(self):
+        "Quit the debugger"
+        self.connection.stop()
         self.root.quit()
 
-    def cmd_run_stop(self):
-        pass
-
-    def cmd_continue(self):
-        pass
+    def cmd_run(self):
+        ""
+        self.connection.do_run()
 
     def cmd_step(self):
-        pass
+        self.connection.do_step()
 
     def cmd_next(self):
-        pass
+        self.connection.do_next()
 
     def cmd_return(self):
-        pass
+        self.connection.do_return()
