@@ -78,10 +78,6 @@ class ReadOnlyCode(Frame):
         )
         self.lines.grid(column=0, row=0, sticky=(N, S))
 
-        self.lines.tag_configure("break",
-            background='red'
-        )
-
         # The Main Text Widget
         self.code = ReadOnlyText(self,
             width=80,
@@ -103,14 +99,10 @@ class ReadOnlyCode(Frame):
 
         # Set up event handlers:
         # - Double clicking on a variable
-        self.code.tag_bind(str(Token.Name), '<Double-1>', self.on_code_variable_double_click)
+        self.code.tag_bind(str(Token.Name), '<Double-1>', self._on_code_variable_double_click)
 
         # - Double clicking on a line number
-        self.lines.bind('<Double-1>', self.on_line_double_click)
-
-        # Set up dummy callbacks
-        self.on_line_selected = None
-        self.on_variable_selected = None
+        self.lines.bind('<Double-1>', self._on_line_double_click)
 
         # The widgets vertical scrollbar
         self.vScrollbar = Scrollbar(self, orient=VERTICAL)
@@ -143,15 +135,18 @@ class ReadOnlyCode(Frame):
                 kwargs['background'] = part[3:]
         return kwargs
 
-    def show(self, filename, line=None, breakpoints=None, refresh=False):
+    def show(self, filename, line=None, refresh=False):
         """Show a specific line of a specific file.
 
         If line is None, no current line will be highlighted
         If refresh is True, the file will be reloaded regardless
+
+        Returns true if a file refresh was performed.
         """
         # If the file has changed, or a refresh has been requested,
         # reload the file.
         if refresh or self.current_file != filename:
+            file_change = True
             self.code.delete('1.0', END)
             with open(filename) as code:
                 for token, content in lex(code.read(), PythonLexer()):
@@ -164,14 +159,13 @@ class ReadOnlyCode(Frame):
             self.lines.config(state=NORMAL)
             self.lines.delete('1.0', END)
             self.lines.insert('1.0', lineNumbers)
-            if breakpoints:
-                for bp_line in breakpoints:
-                    self.show_break(bp_line)
             self.lines.config(state=DISABLED)
 
             # Store the new filename, and clear any current line
             self.current_file = filename
             self.current_line = None
+        else:
+           file_change = False
 
         if self.current_line:
             self.code.tag_remove('current_line',
@@ -190,26 +184,24 @@ class ReadOnlyCode(Frame):
             # Reset the view
             self.code.see('1.0')
 
-    def show_break(self, line):
-        self.lines.tag_add('break',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
+        return file_change
 
-    def remove_break(self, line):
-        self.lines.tag_remove('break',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
+    def _on_line_double_click(self, event):
+        """Internal event handler when a double click event is registered in the lines area.
 
-    def on_line_double_click(self, event):
-        "Response when a double click event is registered in the lines area."
-        if self.on_line_selected:
-            line = int(self.code.index("@%s,%s" % (event.x, event.y)).split('.')[0])
-            self.on_line_selected(line)
+        Converted into an event on a specific line for public API purposes.
+        """
+        line = int(self.code.index("@%s,%s" % (event.x, event.y)).split('.')[0])
+        self.on_line_double_click(line)
 
-    def on_code_variable_double_click(self, event):
+    def on_line_double_click(self, line):
+        "Respose when a "
+        pass
+
+    def _on_code_variable_double_click(self, event):
         "Response when a double click event is registered on a variable."
-        if self.on_variable_selected:
-            range = self.code.tag_nextrange(str(Token.Name), "@%s,%s wordstart" % (event.x, event.y))
-            self.on_variable_selected(self.code.get(range[0], range[1]))
+        range = self.code.tag_nextrange(str(Token.Name), "@%s,%s wordstart" % (event.x, event.y))
+        self.on_code_variable_double_click(self.code.get(range[0], range[1]))
+
+    def on_code_variable_double_click(self, var):
+        pass

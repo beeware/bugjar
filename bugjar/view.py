@@ -9,11 +9,117 @@ from ttk import *
 import tkMessageBox
 
 from bugjar.widgets import ReadOnlyCode
-from bugjar.connection import Debugger
+from bugjar.connection import ConnectionNotBootstrapped, UnknownBreakpoint
+
+
+class DebuggerCode(ReadOnlyCode):
+    def __init__(self, *args, **kwargs):
+        print args, kwargs
+        self.debugger = kwargs.pop('debugger')
+        ReadOnlyCode.__init__(self, *args, **kwargs)
+
+        # Set up styles for line numbers
+        self.lines.tag_configure('enabled',
+            background='red'
+        )
+
+        self.lines.tag_configure('disabled',
+            background='gray'
+        )
+
+        self.lines.tag_configure('ignored',
+            background='green'
+        )
+
+        self.lines.tag_configure('temporary',
+            background='pink'
+        )
+
+    def enable_breakpoint(self, line, temporary=False):
+        self.lines.tag_remove('disabled',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_remove('ignored',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        if temporary:
+            self.lines.tag_remove('enabled',
+                '%s.0' % line,
+                '%s.0' % (line + 1)
+            )
+            self.lines.tag_add('temporary',
+                '%s.0' % line,
+                '%s.0' % (line + 1)
+            )
+        else:
+            self.lines.tag_remove('temporary',
+                '%s.0' % line,
+                '%s.0' % (line + 1)
+            )
+            self.lines.tag_add('enabled',
+                '%s.0' % line,
+                '%s.0' % (line + 1)
+            )
+
+    def disable_breakpoint(self, line):
+        self.lines.tag_remove('enabled',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_remove('ignored',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_remove('temporary',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_add('disabled',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+
+    def clear_breakpoint(self, line):
+        self.lines.tag_remove('enabled',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_remove('disabled',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_remove('ignored',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+        self.lines.tag_remove('temporary',
+            '%s.0' % line,
+            '%s.0' % (line + 1)
+        )
+
+    def on_line_double_click(self, line):
+        "When a line number is double clicked, set a breakpoint"
+        print "Toggle breakpoint"
+        try:
+            bp = self.debugger.breakpoint((self.current_file, line))
+            if bp.enabled:
+                self.debugger.disable_breakpoint(bp)
+            else:
+                self.debugger.enable_breakpoint(bp)
+        except UnknownBreakpoint:
+            self.debugger.create_breakpoint(self.current_file, line)
+        except ConnectionNotBootstrapped:
+            print "Connection not yet configured"
+
+    def on_code_variable_double_click(self, var):
+        "When a variable is double clicked, ..."
+        pass
 
 
 class MainWindow(object):
-    def __init__(self, root, connection):
+    def __init__(self, root, debugger):
         '''
         -----------------------------------------------------
         | main button toolbar                               |
@@ -31,7 +137,9 @@ class MainWindow(object):
 
         '''
 
-        self.connection = connection
+        self.debugger = debugger
+        # Associate the debugger with this view.
+        self.debugger.view = self
 
         # Root window
         self.root = root
@@ -60,51 +168,16 @@ class MainWindow(object):
         self.root.rowconfigure(2, weight=0)
 
         # FIXME - set up some initial content.
-        # self.show_file('/Users/rkm/projects/beeware/bugjar/bugjar/view.py')
-
         self.stack_list.insert('', 'end', text='file1.py', values=('123',))
 
         self.breakpoint_list.insert('', 'end', text='breakpoint1.py', values=('456',))
 
-        connection.start()
+        debugger.start()
         print "STARTED"
         # Queue the first progress handling event
         # self.root.after(100, self.on_progress)
 
-        Debugger.bind('stack', self.on_stackUpdate)
-        Debugger.bind('line', self.on_line)
-        Debugger.bind('call', self.on_call)
-        Debugger.bind('return', self.on_return)
-        Debugger.bind('exception', self.on_exception)
-        Debugger.bind('restart', self.on_restart)
 
-    def on_stackUpdate(self, source, stack):
-        print "STACK UPDATE FOUND"
-        if len(stack) > 0:
-            print stack[-1][0], stack[-1][1]['filename']
-            self.show_file(stack[-1][1]['filename'], line=stack[-1][0])
-        else:
-            # No current frame (probably end of execution),
-            # so clear the current line marker
-            self.set_current_line(None)
-
-    def on_line(self, source, filename, line):
-        self.run_status.set('Line (%s:%s)' % (filename, line))
-
-    def on_call(self, source, args):
-        self.run_status.set('Call: %s' % args)
-
-    def on_return(self, source, retval):
-        self.run_status.set('Return: %s' % retval)
-
-    def on_exception(self, source, **kwargs):
-        print "EXCEPTION FOUND"
-        print kwargs
-        self.run_status.set('Exception')
-
-    def on_restart(self, source):
-        self.run_status.set('Not running')
-        tkMessageBox.showinfo(message='Program has finished, and will restart.')
 
     ######################################################
     # Internal GUI layout methods.
@@ -218,11 +291,8 @@ class MainWindow(object):
         self.current_file_label.grid(column=0, row=0, sticky=(W, E))
 
         # Code display area
-        self.code = ReadOnlyCode(self.code_frame)
+        self.code = DebuggerCode(self.code_frame, debugger=self.debugger)
         self.code.grid(column=0, row=1, sticky=(N, S, E, W))
-
-        # Set up event handlers for code area
-        # self.code.on_line_selected = self.on_set_breakpoint
 
         # Set up weights for the code frame's content
         self.code_frame.columnconfigure(0, weight=1)
@@ -270,11 +340,16 @@ class MainWindow(object):
         breakpoints is a list of line numbers that have current breakpoints.
 
         If refresh is true, the file will be reloaded and redrawn.
+
+        If the code was reloaded and redrawn, return True
         """
         path, name = os.path.split(filename)
 
+        # Set the filename label for the current file
         self.current_file.set('%s (%s)' % (name, path))
-        self.code.show(filename, line=line)
+
+        # Show the contents of the current file
+        return self.code.show(filename=filename, line=line, refresh=refresh)
 
     def set_current_line(self, line):
         """Highlight a specific line of the current file.
@@ -296,18 +371,114 @@ class MainWindow(object):
 
     def on_quit(self):
         "Quit the debugger"
-        self.connection.stop()
+        self.debugger.stop()
         self.root.quit()
 
     def cmd_run(self):
         ""
-        self.connection.do_run()
+        self.debugger.do_run()
 
     def cmd_step(self):
-        self.connection.do_step()
+        self.debugger.do_step()
 
     def cmd_next(self):
-        self.connection.do_next()
+        self.debugger.do_next()
 
     def cmd_return(self):
-        self.connection.do_return()
+        self.debugger.do_return()
+
+    ######################################################
+    # Handlers for debugger responses
+    ######################################################
+
+    def on_stack(self, stack):
+        "A report of a new stack"
+        print "STACK UPDATE FOUND"
+        if len(stack) > 0:
+            line = stack[-1][0]
+            filename = stack[-1][1]['filename']
+            print filename, line
+            file_change = self.show_file(filename=filename, line=line)
+
+            # If there are breakpoints for this file, show them
+            if file_change:
+                for bp in self.debugger.breakpoints(filename).values():
+                    if bp.enabled:
+                        self.code.enable_breakpoint(bp.line)
+                    else:
+                        self.code.disable_breakpoint(bp.line)
+
+        else:
+            # No current frame (probably end of execution),
+            # so clear the current line marker
+            self.set_current_line(None)
+
+    def on_line(self, filename, line):
+        "A single line of code has been executed"
+        self.run_status.set('Line (%s:%s)' % (filename, line))
+
+    def on_call(self, args):
+        "A callable has been invoked"
+        self.run_status.set('Call: %s' % args)
+
+    def on_return(self, retval):
+        "A callable has returned"
+        self.run_status.set('Return: %s' % retval)
+
+    def on_exception(self, **kwargs):
+        "An exception has been raised"
+        print "EXCEPTION FOUND"
+        print kwargs
+        self.run_status.set('Exception')
+
+    def on_restart(self, source):
+        "The code has finished running, and will start again"
+        self.run_status.set('Not running')
+        tkMessageBox.showinfo(message='Program has finished, and will restart.')
+
+    def on_info(self, message):
+        "The debugger needs to inform the user of something"
+        tkMessageBox.showinfo(message=message)
+
+    def on_warning(self, message):
+        "The debugger needs to warn the user of something"
+        tkMessageBox.showwarning(message=message)
+
+    def on_error(self, message):
+        "The debugger needs to report an error"
+        tkMessageBox.showerror(message=message)
+
+    def on_breakpoint_enable(self, bp):
+        "A breakpoint has been enabled in the debugger"
+        print "enable breakpoint", bp
+        if bp.filename == self.code.current_file:
+            print "Enable break in current file"
+            self.code.enable_breakpoint(bp.line, temporary=bp.temporary)
+        else:
+            print "Enable break in other file"
+
+    def on_breakpoint_disable(self, bp):
+        "A breakpoint has been disabled in the debugger"
+        print "disable breakpoint", bp
+        if bp.filename == self.code.current_file:
+            print "Disable break in current file"
+            self.code.disable_breakpoint(bp.line)
+        else:
+            print "Disable break in other file"
+
+    def on_breakpoint_ignore(self, bp, count):
+        print "ignore breakpoint", bp, count, 'iterations'
+        if bp.filename == self.code.current_file:
+            print "Ignore break in current file, count %s" % count
+            self.code.ignore_breakpoint(bp.line)
+        else:
+            print "Ignore break in other file, count %s" % count
+
+    def on_breakpoint_clear(self, bp):
+        "A breakpoint has been cleared in the debugger"
+        print "clear breakpoint", bp
+        if bp.filename == self.code.current_file:
+            print "Clear break in current file"
+            self.code.clear_breakpoint(bp.line)
+        else:
+            print "Clear break in other file"

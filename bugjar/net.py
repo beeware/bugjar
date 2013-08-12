@@ -21,7 +21,13 @@ import os
 import re
 import socket
 import sys
+from threading import Thread
 import traceback
+
+try:
+    from Queue import Queue, Empty
+except ImportError:
+    from queue import Queue, Empty  # python 3.x
 
 
 class Restart(Exception):
@@ -39,18 +45,53 @@ def find_function(funcname, filename):
     except IOError:
         return None
     # consumer of this info expects the first line to be 1
-    lineno = 1
+    line = 1
     answer = None
     while 1:
         line = fp.readline()
         if line == '':
             break
         if cre.match(line):
-            answer = funcname, filename, lineno
+            answer = funcname, filename, line
             break
-        lineno = lineno + 1
+        line = line + 1
     fp.close()
     return answer
+
+
+def command_buffer(debugger):
+    "Buffer input from a socket, yielding complete command packets."
+    remainder = ''
+    while True:
+        new_buffer = debugger.client.recv(1024)
+
+        if not new_buffer:
+            # If recv() returns None, the socket has closed
+            break
+        else:
+            print "NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
+            if new_buffer[-1] == debugger.ETX:
+                terminator = new_buffer[-1]
+                full_buffer = remainder + new_buffer[:-1]
+            else:
+                terminator = None
+                full_buffer = remainder + new_buffer
+
+            messages = full_buffer.split(debugger.ETX)
+            if terminator is None:
+                remainder = messages.pop()
+            else:
+                remainder = ''
+            for message in messages:
+                print "READ %s bytes" % len(message)
+                command, args = json.loads(message)
+                try:
+                    debugger.commands.put(json.loads(message))
+                except ValueError:
+                    print "Invalid command: %s" % message
+
+    print "FINISH PROCESSING COMMAND BUFFER"
+    debugger.commands.put(('close', {}))
 
 
 class Debugger(bdb.Bdb):
@@ -69,6 +110,8 @@ class Debugger(bdb.Bdb):
         self.host = host
         self.port = port
         self.client = None
+        self.command_thread = None
+        self.commands = None
 
     def output(self, event, **data):
         try:
@@ -85,7 +128,7 @@ class Debugger(bdb.Bdb):
         self.forget()
 
     def forget(self):
-        self.lineno = None
+        self.line = None
         self.stack = []
         self.curindex = 0
         self.curframe = None
@@ -147,23 +190,27 @@ class Debugger(bdb.Bdb):
         self.setup(frame, tb)
         while 1:
             try:
-                print "Update initial client state..."
+                print "Update client state..."
                 self.print_stack_entry(self.stack[self.curindex])
 
                 print "Wait for input..."
-                data = self.client.recv(4096)
-                args = data.split(' ', 1)
-                print "args:", args
+                command, args = self.commands.get(block=True)
 
-                if hasattr(self, 'do_%s' % args[0]):
-                    resume = getattr(self, 'do_%s' % args[0])(args[1:])
-                    if resume:
-                        print "resume running"
-                        break
-                    else:
-                        print "wait for more commands"
+                print "command:", command, args
+                if hasattr(self, 'do_%s' % command):
+                    try:
+                        resume = getattr(self, 'do_%s' % command)(**args)
+                        if resume:
+                            print "resume running"
+                            break
+                        else:
+                            print "wait for more commands"
+                    except Exception, e:
+                        print "Unknown problem with command %s: %s" % (command, e)
+                        self.output('error', message='Unknown problem with command %s: %s' % (command, e))
                 else:
-                    self.output('error', message='Unknown command.')
+                    print "Unknown command %s" % command
+                    self.output('error', message='Unknown command: %s' % command)
 
             except (socket.error, AttributeError):
                 # Problem with connection; look for new client
@@ -173,346 +220,201 @@ class Debugger(bdb.Bdb):
                 print "Got connection from", client.getpeername()
                 self.client = client
 
+                # Start the command queue
+                self.commands = Queue()
+                self.command_thread = Thread(target=command_buffer, args=(self,))
+                self.command_thread.daemon = True
+                self.command_thread.start()
+
+                print "Bootstrap the state of a new connection..."
+                self.output('bootstrap', breakpoints=[
+                        {
+                            'bpnum': bp.number,
+                            'filename': bp.file,
+                            'line': bp.line,
+                            'temporary': bp.temporary,
+                            'enabled': bp.enabled,
+                            'funcname': bp.funcname
+                        }
+                        for bp in bdb.Breakpoint.bpbynumber[1:]
+                    ])
+
+        print "END INTERACTION LOOP"
         self.forget()
 
     # Debugger Commands
 
-    def do_break(self, arg, temporary=False):
-        # break [ ([filename:]lineno | function) [, "condition"] ]
-        if not arg:
-            if self.breaks:  # There's at least one
-                # self.output("Num Type         Disp Enb   Where")
-                for bp in bdb.Breakpoint.bpbynumber:
-                    if bp:
-                        bp.bpprint(sys.stdout)
-            return
-        # parse arguments; comma has lowest precedence
-        # and cannot occur in filename
-        filename = None
-        lineno = None
-        cond = None
-        comma = arg.find(',')
-        if comma > 0:
-            # parse stuff after comma: "condition"
-            cond = arg[comma+1:].lstrip()
-            arg = arg[:comma].rstrip()
-        # parse stuff before comma: [filename:]lineno | function
-        colon = arg.rfind(':')
-        funcname = None
-        if colon >= 0:
-            filename = arg[:colon].rstrip()
-            f = self.lookupmodule(filename)
-            if not f:
-                self.output('error', message="%s not found on sys.path" % repr(filename))
-                return
-            else:
-                filename = f
-            arg = arg[colon+1:].lstrip()
-            try:
-                lineno = int(arg)
-            except ValueError:
-                self.output('error', message='Bad lineno: %s' % arg)
-                return
-        else:
-            # no colon; can be lineno or function
-            try:
-                lineno = int(arg)
-            except ValueError:
-                try:
-                    func = eval(arg, self.curframe.f_globals, self.curframe_locals)
-                except:
-                    func = arg
-                try:
-                    if hasattr(func, 'im_func'):
-                        func = func.im_func
-                    code = func.func_code
-                    #use co_name to identify the bkpt (function names
-                    #could be aliased, but co_name is invariant)
-                    funcname = code.co_name
-                    lineno = code.co_firstlineno
-                    filename = code.co_filename
-                except:
-                    # last thing to try
-                    (ok, filename, ln) = self.lineinfo(arg)
-                    if not ok:
-                        self.output('error', message='The object %s is not a function or was not found along sys.path.' % repr(arg))
-                        return
-                    funcname = ok  # ok contains a function name
-                    lineno = int(ln)
-        if not filename:
-            filename = self.curframe.f_code.co_filename
+    def do_break(self, filename, line, temporary=False):
         # Check for reasonable breakpoint
-        line = self.checkline(filename, lineno)
-        if line:
+        if self.is_executable_line(filename, line):
             # now set the break point
-            err = self.set_break(filename, line, temporary, cond, funcname)
+            err = self.set_break(filename, line, temporary, None, None)
             if err:
                 self.output('error', message=err)
             else:
                 bp = self.get_breaks(filename, line)[-1]
-                self.output('breakpoint', number=bp.number, file=bp.file, line=bp.line)
-
-    def do_tbreak(self, arg):
-        self.do_break(arg, temporary=True)
-
-    def lineinfo(self, identifier):
-        failed = (None, None, None)
-        # Input is identifier, may be in single quotes
-        idstring = identifier.split("'")
-        if len(idstring) == 1:
-            # not in single quotes
-            id = idstring[0].strip()
-        elif len(idstring) == 3:
-            # quoted
-            id = idstring[1].strip()
+                self.output('breakpoint_create',
+                    bpnum=bp.number,
+                    filename=bp.file,
+                    line=bp.line,
+                    temporary=bp.temporary,
+                    funcname=bp.funcname
+                )
         else:
-            return failed
-        if id == '':
-            return failed
-        parts = id.split('.')
-        # Protection for derived debuggers
-        if parts[0] == 'self':
-            del parts[0]
-            if len(parts) == 0:
-                return failed
-        # Best first guess at file to look at
-        fname = self.curframe.f_code.co_filename
-        if len(parts) == 1:
-            item = parts[0]
-        else:
-            # More than one part.
-            # First is module, second is method/class
-            f = self.lookupmodule(parts[0])
-            if f:
-                fname = f
-            item = parts[1]
-        answer = find_function(item, fname)
-        return answer or failed
+            self.output('error', message="%s:%s is not executable" % (filename, line))
 
-    def checkline(self, filename, lineno):
-        """Check whether specified line seems to be executable.
+    def is_executable_line(self, filename, line):
+        """Check whether specified line is executable.
 
-        Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
-        line or EOF). Warning: testing is not comprehensive.
+        Return True if it is, False if not (e.g. a docstring, comment, blank
+        line or EOF).
         """
         # this method should be callable before starting debugging, so default
         # to "no globals" if there is no current frame
         globs = self.curframe.f_globals if hasattr(self, 'curframe') else None
-        line = linecache.getline(filename, lineno, globs)
-        if not line:
-            self.output('error', message='End of file')
-            return 0
-        line = line.strip()
+        code = linecache.getline(filename, line, globs)
+        if not code:
+            return False
+        code = code.strip()
         # Don't allow setting breakpoint at a blank line
-        if (not line or (line[0] == '#') or (line[:3] == '"""') or line[:3] == "'''"):
-            self.output('error', message='Blank or comment')
-            return 0
-        return lineno
+        if (not code or (code[0] == '#') or (code[:3] == '"""') or code[:3] == "'''"):
+            return False
+        return True
 
-    def do_enable(self, arg):
-        args = arg.split()
-        for i in args:
-            try:
-                i = int(i)
-            except ValueError:
-                self.output('error', message='Breakpoint index %r is not a number' % i)
-                continue
-
-            if not (0 <= i < len(bdb.Breakpoint.bpbynumber)):
-                self.output('error', message='No breakpoint numbered %s' % i)
-                continue
-
-            bp = bdb.Breakpoint.bpbynumber[i]
-            if bp:
-                bp.enable()
-
-    def do_disable(self, arg):
-        args = arg.split()
-        for i in args:
-            try:
-                i = int(i)
-            except ValueError:
-                self.output('error', message='Breakpoint index %r is not a number' % i)
-                continue
-
-            if not (0 <= i < len(bdb.Breakpoint.bpbynumber)):
-                self.output('error', message='No breakpoint numbered %s' % i)
-                continue
-
-            bp = bdb.Breakpoint.bpbynumber[i]
-            if bp:
-                bp.disable()
-
-    def do_condition(self, arg):
-        # arg is breakpoint number and condition
-        args = arg.split(' ', 1)
-        try:
-            bpnum = int(args[0].strip())
-        except ValueError:
-            # something went wrong
-            self.output('error', message='Breakpoint index %r is not a number' % args[0])
-            return
-        try:
-            cond = args[1]
-        except:
-            cond = None
-        try:
+    def do_enable(self, bpnum):
+        if not (0 <= bpnum < len(bdb.Breakpoint.bpbynumber)):
+            self.output('error', message='No breakpoint numbered %s' % bpnum)
+        else:
             bp = bdb.Breakpoint.bpbynumber[bpnum]
-        except IndexError:
-            self.output('error', message='Breakpoint index %r is not valid' % args[0])
-            return
-        if bp:
-            bp.cond = cond
-            if not cond:
-                self.output('msg', message='Breakpoint %s is now unconditional' % bpnum)
+            bp.enable()
+            self.output('breakpoint_enable', bpnum=bpnum)
 
-    def do_ignore(self, arg):
+    def do_disable(self, bpnum):
+        bpnum = int(bpnum)
+        if not (0 <= bpnum < len(bdb.Breakpoint.bpbynumber)):
+            self.output('error', message='No breakpoint numbered %s' % bpnum)
+        else:
+            bp = bdb.Breakpoint.bpbynumber[bpnum]
+            bp.disable()
+            self.output('breakpoint_disable', bpnum=bpnum)
+
+    # def do_condition(self, arg):
+    #     # arg is breakpoint number and condition
+    #     args = arg.split(' ', 1)
+    #     try:
+    #         bpnum = int(args[0].strip())
+    #     except ValueError:
+    #         # something went wrong
+    #         self.output('error', message='Breakpoint index %r is not a number' % args[0])
+    #         return
+    #     try:
+    #         cond = args[1]
+    #     except:
+    #         cond = None
+    #     try:
+    #         bp = bdb.Breakpoint.bpbynumber[bpnum]
+    #     except IndexError:
+    #         self.output('error', message='Breakpoint index %r is not valid' % args[0])
+    #         return
+    #     if bp:
+    #         bp.cond = cond
+    #         if not cond:
+    #             self.output('msg', message='Breakpoint %s is now unconditional' % bpnum)
+
+    def do_ignore(self, bpnum, count):
         """arg is bp number followed by ignore count."""
-        args = arg.split()
         try:
-            bpnum = int(args[0].strip())
+            count = int(count)
         except ValueError:
-            # something went wrong
-            self.output('error', message='Breakpoint index %r is not a number' % args[0])
-            return
-        try:
-            count = int(args[1].strip())
-        except:
             count = 0
-        try:
+
+        if not (0 <= bpnum < len(bdb.Breakpoint.bpbynumber)):
+            self.output('error', message='No breakpoint numbered %s' % bpnum)
+        else:
             bp = bdb.Breakpoint.bpbynumber[bpnum]
-        except IndexError:
-            self.output('error', message='Breakpoint index %r is not valid' % args[0])
-            return
-        if bp:
             bp.ignore = count
             if count > 0:
-                reply = 'Will ignore next '
-                if count > 1:
-                    reply = reply + '%d crossings' % count
-                else:
-                    reply = reply + '1 crossing'
-                self.output('msg', message='%s crossing of breakpoint %d' % (reply, bpnum))
+                self.output('breakpoint_ignore', bpnum=bpnum, count=count)
             else:
-                self.output('msg', message='Will stop the next time breakpoint %s is reached.' % bpnum)
+                self.output('breakpoint_enable', bpnum=bpnum)
 
-    def do_clear(self, arg):
-        """Three possibilities, tried in this order:
-        clear -> clear all breaks, ask for confirmation
-        clear file:lineno -> clear all breaks at file:lineno
-        clear bpno bpno ... -> clear breakpoints by number"""
-        if not arg:
-            try:
-                reply = raw_input('Clear all breaks? ')
-            except EOFError:
-                reply = 'no'
-            reply = reply.strip().lower()
-            if reply in ('y', 'yes'):
-                self.clear_all_breaks()
-            return
-        if ':' in arg:
-            # Make sure it works for "clear C:\foo\bar.py:12"
-            i = arg.rfind(':')
-            filename = arg[:i]
-            arg = arg[i+1:]
-            try:
-                lineno = int(arg)
-            except ValueError:
-                err = "Invalid line number (%s)" % arg
-            else:
-                err = self.clear_break(filename, lineno)
-            if err:
-                self.output('error', message=err)
-            return
-        numberlist = arg.split()
-        for i in numberlist:
-            try:
-                i = int(i)
-            except ValueError:
-                self.output('error', message='Breakpoint index %r is not a number' % i)
-                continue
-
-            if not (0 <= i < len(bdb.Breakpoint.bpbynumber)):
-                self.output('error', message='No breakpoint numbered %s' % i)
-                continue
-            err = self.clear_bpbynumber(i)
+    def do_clear(self, bpnum):
+        bpnum = int(bpnum)
+        if not (0 <= bpnum < len(bdb.Breakpoint.bpbynumber)):
+            self.output('error', message='No breakpoint numbered %s' % bpnum)
+        else:
+            err = self.clear_bpbynumber(bpnum)
             if err:
                 self.output('error', message=err)
             else:
-                self.output('message', message='Deleted breakpoint %s' % i)
+                self.output('breakpoint_clear', bpnum=bpnum)
 
-    def do_up(self, arg):
-        if self.curindex == 0:
-            self.output('message', message='Oldest frame')
-        else:
-            self.curindex = self.curindex - 1
-            self.curframe = self.stack[self.curindex][0]
-            self.curframe_locals = self.curframe.f_locals
-            self.print_stack_entry(self.stack[self.curindex])
-            self.lineno = None
+    # def do_up(self, arg):
+    #     if self.curindex == 0:
+    #         self.output('error', message='Already at oldest frame')
+    #     else:
+    #         self.curindex = self.curindex - 1
+    #         self.curframe = self.stack[self.curindex][0]
+    #         self.curframe_locals = self.curframe.f_locals
+    #         self.print_stack_entry(self.stack[self.curindex])
+    #         self.lineno = None
 
-    def do_down(self, arg):
-        if self.curindex + 1 == len(self.stack):
-            self.output('message', message='Newest frame')
-        else:
-            self.curindex = self.curindex + 1
-            self.curframe = self.stack[self.curindex][0]
-            self.curframe_locals = self.curframe.f_locals
-            self.print_stack_entry(self.stack[self.curindex])
-            self.lineno = None
+    # def do_down(self, arg):
+    #     if self.curindex + 1 == len(self.stack):
+    #         self.output('error', message='Alread at newest frame')
+    #     else:
+    #         self.curindex = self.curindex + 1
+    #         self.curframe = self.stack[self.curindex][0]
+    #         self.curframe_locals = self.curframe.f_locals
+    #         self.print_stack_entry(self.stack[self.curindex])
+    #         self.lineno = None
 
-    def do_until(self, arg):
-        self.set_until(self.curframe)
-        return 1
+    # def do_until(self, arg):
+    #     self.set_until(self.curframe)
+    #     return 1
 
-    def do_step(self, arg):
+    def do_step(self):
         self.set_step()
         return 1
-    do_s = do_step
 
-    def do_next(self, arg):
+    def do_next(self):
         self.set_next(self.curframe)
         return 1
-    do_n = do_next
 
-    def do_run(self, arg):
+    def do_restart(self, **argv):
         """Restart program by raising an exception to be caught in the main
         debugger loop.  If arguments were given, set them in sys.argv."""
-        if arg:
-            import shlex
+        if argv:
             argv0 = sys.argv[0:1]
-            sys.argv = shlex.split(arg)
+            sys.argv = argv
             sys.argv[:0] = argv0
         raise Restart
 
-    def do_return(self, arg):
+    def do_return(self):
         self.set_return(self.curframe)
         return 1
-    do_r = do_return
 
-    def do_continue(self, arg):
+    def do_continue(self):
         self.set_continue()
         return 1
-    do_cont = do_continue
-    do_c = do_continue
 
-    def do_jump(self, arg):
-        if self.curindex + 1 != len(self.stack):
-            self.output('error', message='You can only jump within the bottom frame')
-            return
-        try:
-            arg = int(arg)
-        except ValueError:
-            self.output('error', message="The 'jump' command requires a line number")
-        else:
-            try:
-                # Do the jump, fix up our copy of the stack, and display the
-                # new position
-                self.curframe.f_lineno = arg
-                self.stack[self.curindex] = self.stack[self.curindex][0], arg
-                self.print_stack_entry(self.stack[self.curindex])
-            except ValueError, e:
-                self.output('error', message="Jump failed: %s" % e)
+    # def do_jump(self, arg):
+    #     if self.curindex + 1 != len(self.stack):
+    #         self.output('error', message='You can only jump within the bottom frame')
+    #         return
+    #     try:
+    #         arg = int(arg)
+    #     except ValueError:
+    #         self.output('error', message="The 'jump' command requires a line number")
+    #     else:
+    #         try:
+    #             # Do the jump, fix up our copy of the stack, and display the
+    #             # new position
+    #             self.curframe.f_lineno = arg
+    #             self.stack[self.curindex] = self.stack[self.curindex][0], arg
+    #             self.print_stack_entry(self.stack[self.curindex])
+    #         except ValueError, e:
+    #             self.output('error', message="Jump failed: %s" % e)
 
     # def do_debug(self, arg):
     #     sys.settrace(None)
@@ -526,41 +428,56 @@ class Debugger(bdb.Bdb):
     #     sys.settrace(self.trace_dispatch)
     #     self.lastcmd = p.lastcmd
 
-    def do_quit(self, arg):
+    def do_quit(self):
         self._user_requested_quit = True
         self.set_quit()
         return 1
 
-    def do_args(self, arg):
-        co = self.curframe.f_code
-        locals = self.curframe_locals
-        n = co.co_argcount
-        if co.co_flags & 4:
-            n = n + 1
-        if co.co_flags & 8:
-            n = n + 1
-        for i in range(n):
-            name = co.co_varnames[i]
-            self.output('arg', name=locals.get(name, '*** undefined ***'))
+    def do_close(self):
+        """Respond to a closed socket.
 
-    def do_retval(self, arg):
-        if '__return__' in self.curframe_locals:
-            self.output('retval', value=self.curframe_locals['__return__'])
-        else:
-            self.output('error', message='Not yet returned!')
+        This isn't actually a user comman,but it's something the command
+        queue can generate in response to the socket closing; we handle
+        it as a user command for the sake of elegance.
+        """
+        print "Close down socket"
+        self.client = None
+        print "Wait for command thread"
+        self.command_thread.join()
+        print "Thread is dead"
+        self.commands = None
+        return 1
 
-    def _getval(self, arg):
-        try:
-            return eval(arg, self.curframe.f_globals,
-                        self.curframe_locals)
-        except:
-            t, v = sys.exc_info()[:2]
-            if isinstance(t, str):
-                exc_type_name = t
-            else:
-                exc_type_name = t.__name__
-            # self.output({'***', exc_type_name + ':', repr(v))
-            raise
+    # def do_args(self, arg):
+    #     co = self.curframe.f_code
+    #     locals = self.curframe_locals
+    #     n = co.co_argcount
+    #     if co.co_flags & 4:
+    #         n = n + 1
+    #     if co.co_flags & 8:
+    #         n = n + 1
+    #     for i in range(n):
+    #         name = co.co_varnames[i]
+    #         self.output('arg', name=locals.get(name, '*** undefined ***'))
+
+    # def do_retval(self, arg):
+    #     if '__return__' in self.curframe_locals:
+    #         self.output('retval', value=self.curframe_locals['__return__'])
+    #     else:
+    #         self.output('error', message='Not yet returned!')
+
+    # def _getval(self, arg):
+    #     try:
+    #         return eval(arg, self.curframe.f_globals,
+    #                     self.curframe_locals)
+    #     except:
+    #         t, v = sys.exc_info()[:2]
+    #         if isinstance(t, str):
+    #             exc_type_name = t
+    #         else:
+    #             exc_type_name = t.__name__
+    #         # self.output({'***', exc_type_name + ':', repr(v))
+    #         raise
 
     # def do_print(self, arg):
     #     try:
@@ -576,13 +493,6 @@ class Debugger(bdb.Bdb):
     # It is also consistent with the up/down commands (which are
     # compatible with dbx and gdb: up moves towards 'main()'
     # and down moves towards the most recent stack frame).
-
-    def print_stack_trace(self):
-        try:
-            for frame_lineno in self.stack:
-                self.print_stack_entry(frame_lineno)
-        except KeyboardInterrupt:
-            pass
 
     def print_stack_entry(self, frame_lineno, prompt_prefix='>'):
         # frame, lineno = frame_lineno
@@ -605,30 +515,6 @@ class Debugger(bdb.Bdb):
             for frame, line_no in self.stack[2:]
         ]
         self.output('stack', stack=stack_data)
-
-    def lookupmodule(self, filename):
-        """Helper function for break/clear parsing -- may be overridden.
-
-        lookupmodule() translates (possibly incomplete) file or module name
-        into an absolute file name.
-        """
-        if os.path.isabs(filename) and os.path.exists(filename):
-            return filename
-        f = os.path.join(sys.path[0], filename)
-        if os.path.exists(f) and self.canonic(f) == self.mainpyfile:
-            return f
-        root, ext = os.path.splitext(filename)
-        if ext == '':
-            filename = filename + '.py'
-        if os.path.isabs(filename):
-            return filename
-        for dirname in sys.path:
-            while os.path.islink(dirname):
-                dirname = os.readlink(dirname)
-            fullname = os.path.join(dirname, filename)
-            if os.path.exists(fullname):
-                return fullname
-        return None
 
     def _runscript(self, filename):
         # The script has to run in __main__ namespace (or imports from
@@ -672,12 +558,16 @@ def main():
         print bugjar.VERSION
         return
 
+    # Convert the filename provided on the command line into a canonical form
+    filename = os.path.abspath(options.mainpyfile)
+    filename = os.path.normcase(filename)
+
     # Hide "debugger.py" from argument list
-    sys.argv[0] = options.mainpyfile
+    sys.argv[0] = filename
     sys.argv[1:] = options.args
 
     # Replace debugger's dir with script's dir in front of module search path.
-    sys.path[0] = os.path.dirname(options.mainpyfile)
+    sys.path[0] = os.path.dirname(filename)
 
     # Create a socket and listen on it for a client debugger
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -691,7 +581,7 @@ def main():
     while True:
         try:
             print 'Start the script'
-            debugger._runscript(options.mainpyfile)
+            debugger._runscript(filename)
 
             if debugger._user_requested_quit:
                 print 'user requested exit'
@@ -699,12 +589,14 @@ def main():
 
             debugger.output('restart')
         except Restart:
-            print "Restarting", options.mainpyfile, "with arguments:"
+            print "Restarting", filename, "with arguments:"
             print "\t" + " ".join(sys.argv[1:])
         except KeyboardInterrupt:
+            print "Keyboard interrupt"
             debugger.client = None
             break
         except SystemExit:
+            print "System exit"
             debugger.client = None
             break
         except socket.error:
@@ -717,7 +609,7 @@ def main():
             print "Running 'cont' or 'step' will restart the program"
             t = sys.exc_info()[2]
             debugger.interaction(None, t)
-            print "Post mortem debugger finished. The " + options.mainpyfile + \
+            print "Post mortem debugger finished. The " + filename + \
                   " will be restarted"
             break
 
