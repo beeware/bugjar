@@ -35,7 +35,7 @@ def command_buffer(debugger):
             # If recv() returns None, the socket has closed
             break
         else:
-            print "NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
+            # print "NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
             if new_buffer[-1] == debugger.ETX:
                 terminator = new_buffer[-1]
                 full_buffer = remainder + new_buffer[:-1]
@@ -49,7 +49,7 @@ def command_buffer(debugger):
             else:
                 remainder = ''
             for message in messages:
-                print "READ %s bytes" % len(message)
+                # print "READ %s bytes" % len(message)
                 event, data = json.loads(message)
 
                 if hasattr(debugger, 'on_%s' % event):
@@ -80,15 +80,13 @@ class Debugger(object):
         connected = False
         while not connected:
             try:
-                print (self.host, self.port)
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket.connect((self.host, self.port))
                 connected = True
             except socket.error, e:
-                print "no connection", e
-                time.sleep(0.1)
+                print "Waiting for connection...", e
+                time.sleep(1.0)
 
-        print "GOT CONNECTION"
         t = Thread(target=command_buffer, args=(self,))
         t.daemon = True
         t.start()
@@ -97,10 +95,8 @@ class Debugger(object):
         "Shut down the debugger session"
         if self.proc is not None:
             # If this is a local debugger session, kill the child process.
-            print "Tell child process to quit"
             self.socket.sendall('quit')
 
-        print "Shutdown socket"
         self.socket.shutdown(socket.SHUT_WR)
 
         if self.proc is not None:
@@ -108,15 +104,13 @@ class Debugger(object):
             # the child process to die.
             print "Waiting for child process to die..."
             self.proc.wait()
-            print "Child process is dead"
 
     def output(self, event, **data):
         "Send a single command packet to the debugger"
         try:
-            print "OUTPUT %s byte message" % len(json.dumps((event, data)) + Debugger.ETX)
+            # print "OUTPUT %s byte message" % len(json.dumps((event, data)) + Debugger.ETX)
             self.socket.sendall(json.dumps((event, data)) + Debugger.ETX)
         except socket.error, e:
-            traceback.print_exc
             print "CLIENT ERROR", e
         except AttributeError, e:
             print "No client yet", e
@@ -195,16 +189,13 @@ class Debugger(object):
     #################################################################
 
     def on_bootstrap(self, breakpoints):
-        print "BOOTSTRAP"
         self.bp_index = {}
         self.bp_list = [None]
         for bp_data in breakpoints:
-            print "BREAKPOINT", bp_data
             self.on_breakpoint_create(**bp_data)
 
     def on_breakpoint_create(self, **bp_data):
         bp = Breakpoint(**bp_data)
-        print bp, bp.line, bp.enabled
         self.bp_index.setdefault(bp.filename, {}).setdefault(bp.line, bp)
         self.bp_list.append(bp)
         if bp.enabled:
@@ -232,12 +223,20 @@ class Debugger(object):
         self.view.on_breakpoint_clear(bp=bp)
 
     def on_stack(self, stack):
-        print "STACK"
+        self.stack = stack
         self.view.on_stack(stack=stack)
 
     def on_restart(self):
-        print "RESTART"
         self.view.on_restart()
+
+    def on_call(self, args):
+        self.view.on_call(args)
+
+    def on_return(self, retval):
+        self.view.on_return(retval)
+
+    def on_line(self, filename, line):
+        self.view.on_line(filename, line)
 
     def on_info(self, message):
         self.view.on_info(message=message)

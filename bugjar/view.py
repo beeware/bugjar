@@ -8,114 +8,7 @@ from tkFont import *
 from ttk import *
 import tkMessageBox
 
-from bugjar.widgets import ReadOnlyCode
-from bugjar.connection import ConnectionNotBootstrapped, UnknownBreakpoint
-
-
-class DebuggerCode(ReadOnlyCode):
-    def __init__(self, *args, **kwargs):
-        print args, kwargs
-        self.debugger = kwargs.pop('debugger')
-        ReadOnlyCode.__init__(self, *args, **kwargs)
-
-        # Set up styles for line numbers
-        self.lines.tag_configure('enabled',
-            background='red'
-        )
-
-        self.lines.tag_configure('disabled',
-            background='gray'
-        )
-
-        self.lines.tag_configure('ignored',
-            background='green'
-        )
-
-        self.lines.tag_configure('temporary',
-            background='pink'
-        )
-
-    def enable_breakpoint(self, line, temporary=False):
-        self.lines.tag_remove('disabled',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_remove('ignored',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        if temporary:
-            self.lines.tag_remove('enabled',
-                '%s.0' % line,
-                '%s.0' % (line + 1)
-            )
-            self.lines.tag_add('temporary',
-                '%s.0' % line,
-                '%s.0' % (line + 1)
-            )
-        else:
-            self.lines.tag_remove('temporary',
-                '%s.0' % line,
-                '%s.0' % (line + 1)
-            )
-            self.lines.tag_add('enabled',
-                '%s.0' % line,
-                '%s.0' % (line + 1)
-            )
-
-    def disable_breakpoint(self, line):
-        self.lines.tag_remove('enabled',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_remove('ignored',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_remove('temporary',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_add('disabled',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-
-    def clear_breakpoint(self, line):
-        self.lines.tag_remove('enabled',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_remove('disabled',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_remove('ignored',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-        self.lines.tag_remove('temporary',
-            '%s.0' % line,
-            '%s.0' % (line + 1)
-        )
-
-    def on_line_double_click(self, line):
-        "When a line number is double clicked, set a breakpoint"
-        print "Toggle breakpoint"
-        try:
-            bp = self.debugger.breakpoint((self.current_file, line))
-            if bp.enabled:
-                self.debugger.disable_breakpoint(bp)
-            else:
-                self.debugger.enable_breakpoint(bp)
-        except UnknownBreakpoint:
-            self.debugger.create_breakpoint(self.current_file, line)
-        except ConnectionNotBootstrapped:
-            print "Connection not yet configured"
-
-    def on_code_variable_double_click(self, var):
-        "When a variable is double clicked, ..."
-        pass
+from bugjar.widgets import DebuggerCode, BreakpointView, StackView
 
 
 class MainWindow(object):
@@ -136,6 +29,9 @@ class MainWindow(object):
         -----------------------------------------------------
 
         '''
+
+        self.base_path = os.path.abspath(os.getcwd())
+        self.base_path = os.path.normcase(self.base_path) + '/'
 
         self.debugger = debugger
         # Associate the debugger with this view.
@@ -167,17 +63,7 @@ class MainWindow(object):
         self.root.rowconfigure(1, weight=1)
         self.root.rowconfigure(2, weight=0)
 
-        # FIXME - set up some initial content.
-        self.stack_list.insert('', 'end', text='file1.py', values=('123',))
-
-        self.breakpoint_list.insert('', 'end', text='breakpoint1.py', values=('456',))
-
         debugger.start()
-        print "STARTED"
-        # Queue the first progress handling event
-        # self.root.after(100, self.on_progress)
-
-
 
     ######################################################
     # Internal GUI layout methods.
@@ -267,19 +153,69 @@ class MainWindow(object):
         self.file_notebook = Notebook(self.content, padding=(0, 5, 0, 5))
         self.content.add(self.file_notebook)
 
-        self.stack_list = Treeview(self.content)
-        self.stack_list.grid(column=0, row=0, sticky=(N, S, E, W))
-        self.stack_list['columns'] = ('line',)
-        self.stack_list.column('line', width=100, anchor='center')
-        self.stack_list.heading('line', text='Line')
-        self.file_notebook.add(self.stack_list, text='Stack')
+        self._setup_stack_frame_list()
+        self._setup_breakpoint_list()
 
-        self.breakpoint_list = Treeview(self.content)
+    def _setup_stack_frame_list(self):
+        self.stack_frame = Frame(self.content)
+        self.stack_frame.grid(column=0, row=0, sticky=(N, S, E, W))
+        self.file_notebook.add(self.stack_frame, text='Stack')
+
+        self.stack = StackView(self.stack_frame)
+        self.stack.grid(column=0, row=0, sticky=(N, S, E, W))
+
+        self.stack['columns'] = ('line',)
+        self.stack.column('line', width=50, anchor='center')
+        self.stack.heading('#0', text='File')
+        self.stack.heading('line', text='Line')
+
+        # # The tree's vertical scrollbar
+        self.stack_scrollbar = Scrollbar(self.stack_frame, orient=VERTICAL)
+        self.stack_scrollbar.grid(column=1, row=0, sticky=(N, S))
+
+        # # Tie the scrollbar to the text views, and the text views
+        # # to each other.
+        self.stack.config(yscrollcommand=self.stack_scrollbar.set)
+        self.stack_scrollbar.config(command=self.stack.yview)
+
+        # Setup weights for the "stack" tree
+        self.stack_frame.columnconfigure(0, weight=1)
+        self.stack_frame.columnconfigure(1, weight=0)
+        self.stack_frame.rowconfigure(0, weight=1)
+
+        # Handlers for GUI events
+        self.stack.bind('<<TreeviewSelect>>', self.on_stack_frame_selected)
+
+    def _setup_breakpoint_list(self):
+        self.breakpoint_list_frame = Frame(self.content)
+        self.breakpoint_list_frame.grid(column=0, row=0, sticky=(N, S, E, W))
+        self.file_notebook.add(self.breakpoint_list_frame, text='Breakpoints')
+
+        self.breakpoint_list = BreakpointView(self.breakpoint_list_frame)
         self.breakpoint_list.grid(column=0, row=0, sticky=(N, S, E, W))
-        self.breakpoint_list['columns'] = ('line',)
-        self.breakpoint_list.column('line', width=100, anchor='center')
-        self.breakpoint_list.heading('line', text='Line')
-        self.file_notebook.add(self.breakpoint_list, text='Breakpoints')
+
+        # self.breakpoint_list['columns'] = ('line',)
+        # self.breakpoint_list.column('line', width=100, anchor='center')
+        self.breakpoint_list.heading('#0', text='File')
+        # self.breakpoint_list.heading('line', text='Line')
+
+        # The tree's vertical scrollbar
+        self.breakpoint_list_scrollbar = Scrollbar(self.breakpoint_list_frame, orient=VERTICAL)
+        self.breakpoint_list_scrollbar.grid(column=1, row=0, sticky=(N, S))
+
+        # Tie the scrollbar to the text views, and the text views
+        # to each other.
+        self.breakpoint_list.config(yscrollcommand=self.breakpoint_list_scrollbar.set)
+        self.breakpoint_list_scrollbar.config(command=self.breakpoint_list.yview)
+
+        # Setup weights for the "breakpoint list" tree
+        self.breakpoint_list_frame.columnconfigure(0, weight=1)
+        self.breakpoint_list_frame.columnconfigure(1, weight=0)
+        self.breakpoint_list_frame.rowconfigure(0, weight=1)
+
+        # Handlers for GUI events
+        self.breakpoint_list.tag_bind('breakpoint', '<Double-Button-1>', self.on_breakpoint_double_clicked)
+        self.breakpoint_list.tag_bind('breakpoint', '<<TreeviewSelect>>', self.on_breakpoint_selected)
 
     def _setup_code_area(self):
         self.code_frame = Frame(self.content)
@@ -340,23 +276,24 @@ class MainWindow(object):
         breakpoints is a list of line numbers that have current breakpoints.
 
         If refresh is true, the file will be reloaded and redrawn.
-
-        If the code was reloaded and redrawn, return True
         """
-        path, name = os.path.split(filename)
-
         # Set the filename label for the current file
-        self.current_file.set('%s (%s)' % (name, path))
+        if filename.startswith(self.base_path):
+            self.current_file.set(filename[len(self.base_path):])
+        else:
+            self.current_file.set(filename)
 
         # Show the contents of the current file
-        return self.code.show(filename=filename, line=line, refresh=refresh)
+        file_change = self.code.show(filename=filename, line=line, refresh=refresh)
 
-    def set_current_line(self, line):
-        """Highlight a specific line of the current file.
-
-        If line==None, the current line marker will be removed.
-        """
-        self.show_file(self.code.current_file, line=line)
+        # If the file changed, and there are breakpoints for this file,
+        # show them in the file window.
+        if file_change:
+            for bp in self.debugger.breakpoints(filename).values():
+                if bp.enabled:
+                    self.code.enable_breakpoint(bp.line)
+                else:
+                    self.code.disable_breakpoint(bp.line)
 
     ######################################################
     # TK Main loop
@@ -388,30 +325,51 @@ class MainWindow(object):
         self.debugger.do_return()
 
     ######################################################
+    # Handlers for GUI actions
+    ######################################################
+
+    def on_stack_frame_selected(self, event):
+        "When a stack frame is selected, highlight the file and line"
+        _, index = event.widget.selection()[0].split(':')
+        line, frame = self.debugger.stack[int(index)]
+        self.show_file(filename=frame['filename'], line=line)
+
+    def on_breakpoint_selected(self, event):
+        "When a breakpoint on the tree has been selected, show the breakpoint"
+        parts = event.widget.focus().split(':')
+        bp = self.debugger.breakpoint((parts[0], int(parts[1])))
+        self.show_file(filename=bp.filename, line=bp.line)
+
+    def on_breakpoint_double_clicked(self, event):
+        "When a breakpoint on the tree is double clicked, toggle it's status"
+        parts = event.widget.focus().split(':')
+        bp = self.debugger.breakpoint((parts[0], int(parts[1])))
+        if bp.enabled:
+            self.debugger.disable_breakpoint(bp)
+        else:
+            self.debugger.enable_breakpoint(bp)
+
+    ######################################################
     # Handlers for debugger responses
     ######################################################
 
     def on_stack(self, stack):
         "A report of a new stack"
-        print "STACK UPDATE FOUND"
+        # Update the stack list
+        self.stack.update_stack(stack)
+
         if len(stack) > 0:
+            # Update the display of the current file
             line = stack[-1][0]
             filename = stack[-1][1]['filename']
-            print filename, line
-            file_change = self.show_file(filename=filename, line=line)
+            self.show_file(filename=filename, line=line)
 
-            # If there are breakpoints for this file, show them
-            if file_change:
-                for bp in self.debugger.breakpoints(filename).values():
-                    if bp.enabled:
-                        self.code.enable_breakpoint(bp.line)
-                    else:
-                        self.code.disable_breakpoint(bp.line)
-
+            # Select the current stack frame in the frame list
+            self.stack.selection_set('frame:%s' % (len(stack) - 1))
         else:
             # No current frame (probably end of execution),
             # so clear the current line marker
-            self.set_current_line(None)
+            self.code.clear_current_line()
 
     def on_line(self, filename, line):
         "A single line of code has been executed"
@@ -431,7 +389,7 @@ class MainWindow(object):
         print kwargs
         self.run_status.set('Exception')
 
-    def on_restart(self, source):
+    def on_restart(self):
         "The code has finished running, and will start again"
         self.run_status.set('Not running')
         tkMessageBox.showinfo(message='Program has finished, and will restart.')
@@ -450,35 +408,40 @@ class MainWindow(object):
 
     def on_breakpoint_enable(self, bp):
         "A breakpoint has been enabled in the debugger"
-        print "enable breakpoint", bp
+        # If the breakpoint is in the currently displayed file, updated
+        # the display of the breakpoint.
         if bp.filename == self.code.current_file:
-            print "Enable break in current file"
             self.code.enable_breakpoint(bp.line, temporary=bp.temporary)
-        else:
-            print "Enable break in other file"
+
+        # ... then update the display of the breakpoint on the tree
+        self.breakpoint_list.update_breakpoint(bp)
 
     def on_breakpoint_disable(self, bp):
         "A breakpoint has been disabled in the debugger"
-        print "disable breakpoint", bp
+        # If the breakpoint is in the currently displayed file, updated
+        # the display of the breakpoint.
         if bp.filename == self.code.current_file:
-            print "Disable break in current file"
             self.code.disable_breakpoint(bp.line)
-        else:
-            print "Disable break in other file"
+
+        # ... then update the display of the breakpoint on the tree
+        self.breakpoint_list.update_breakpoint(bp)
 
     def on_breakpoint_ignore(self, bp, count):
-        print "ignore breakpoint", bp, count, 'iterations'
+        "A breakpoint has been ignored by the debugger"
+        # If the breakpoint is in the currently displayed file, updated
+        # the display of the breakpoint.
         if bp.filename == self.code.current_file:
-            print "Ignore break in current file, count %s" % count
             self.code.ignore_breakpoint(bp.line)
-        else:
-            print "Ignore break in other file, count %s" % count
+
+        # ... then update the display of the breakpoint on the tree
+        self.breakpoint_list.update_breakpoint(bp)
 
     def on_breakpoint_clear(self, bp):
         "A breakpoint has been cleared in the debugger"
-        print "clear breakpoint", bp
+        # If the breakpoint is in the currently displayed file, updated
+        # the display of the breakpoint.
         if bp.filename == self.code.current_file:
-            print "Clear break in current file"
             self.code.clear_breakpoint(bp.line)
-        else:
-            print "Clear break in other file"
+
+        # ... then update the display of the breakpoint on the tree
+        self.breakpoint_list.update_breakpoint(bp)

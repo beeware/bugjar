@@ -159,7 +159,7 @@ class Debugger(bdb.Bdb):
             if (self.mainpyfile != self.canonic(frame.f_code.co_filename) or frame.f_lineno <= 0):
                 return
             self._run_state = Debugger.STARTED
-        self.output('line', filename=os.path.basename(frame.f_code.co_filename), line=frame.f_lineno)
+        self.output('line', filename=self.canonic(frame.f_code.co_filename), line=frame.f_lineno)
         self.interaction(frame, None)
 
     def user_return(self, frame, return_value):
