@@ -11,85 +11,88 @@ class DebuggerCode(ReadOnlyCode):
         ReadOnlyCode.__init__(self, *args, **kwargs)
 
         # Set up styles for line numbers
-        self.lines.tag_configure('enabled',
-            background='red'
-        )
-
-        self.lines.tag_configure('disabled',
-            background='gray'
-        )
-
-        self.lines.tag_configure('ignored',
-            background='green'
-        )
-
-        self.lines.tag_configure('temporary',
-            background='pink'
-        )
+        self.lines.tag_configure('enabled', background='red')
+        self.lines.tag_configure('disabled', background='gray')
+        self.lines.tag_configure('ignored', background='green')
+        self.lines.tag_configure('temporary', background='pink')
 
         self.line_bind('<Double-1>', self.on_line_double_click)
         self.name_bind('<Double-1>', self.on_name_double_click)
 
     def enable_breakpoint(self, line, temporary=False):
-        self.lines.tag_remove('disabled',
+        self.lines.tag_remove(
+            'disabled',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_remove('ignored',
+        self.lines.tag_remove(
+            'ignored',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
         if temporary:
-            self.lines.tag_remove('enabled',
+            self.lines.tag_remove(
+                'enabled',
                 '%s.0' % line,
                 '%s.0' % (line + 1)
             )
-            self.lines.tag_add('temporary',
+            self.lines.tag_add(
+                'temporary',
                 '%s.0' % line,
                 '%s.0' % (line + 1)
             )
         else:
-            self.lines.tag_remove('temporary',
+            self.lines.tag_remove(
+                'temporary',
                 '%s.0' % line,
                 '%s.0' % (line + 1)
             )
-            self.lines.tag_add('enabled',
+            self.lines.tag_add(
+                'enabled',
                 '%s.0' % line,
                 '%s.0' % (line + 1)
             )
 
     def disable_breakpoint(self, line):
-        self.lines.tag_remove('enabled',
+        self.lines.tag_remove(
+            'enabled',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_remove('ignored',
+        self.lines.tag_remove(
+            'ignored',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_remove('temporary',
+        self.lines.tag_remove(
+            'temporary',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_add('disabled',
+        self.lines.tag_add(
+            'disabled',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
 
     def clear_breakpoint(self, line):
-        self.lines.tag_remove('enabled',
+        self.lines.tag_remove(
+            'enabled',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_remove('disabled',
+        self.lines.tag_remove(
+            'disabled',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_remove('ignored',
+        self.lines.tag_remove(
+            'ignored',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
-        self.lines.tag_remove('temporary',
+        self.lines.tag_remove(
+            'temporary',
             '%s.0' % line,
             '%s.0' % (line + 1)
         )
@@ -127,21 +130,10 @@ class BreakpointView(Treeview):
         # self.heading('line', text='Line')
 
         # Set up styles for line numbers
-        self.tag_configure('enabled',
-            foreground='red'
-        )
-
-        self.tag_configure('disabled',
-            foreground='gray'
-        )
-
-        self.tag_configure('ignored',
-            foreground='green'
-        )
-
-        self.tag_configure('temporary',
-            foreground='pink'
-        )
+        self.tag_configure('enabled', foreground='red')
+        self.tag_configure('disabled', foreground='gray')
+        self.tag_configure('ignored', foreground='green')
+        self.tag_configure('temporary', foreground='pink')
 
     def update_breakpoint(self, bp):
         """Update the visualization of a breakpoint in the tree.
@@ -216,7 +208,8 @@ class StackView(Treeview):
         index = 0
         for line, frame in stack:
             if index < len(displayed):
-                item = self.item(displayed[index],
+                self.item(
+                    displayed[index],
                     text=frame['filename'],
                     values=(line,)
                 )
@@ -242,26 +235,93 @@ class InspectorView(Treeview):
         kwargs['selectmode'] = 'browse'
         Treeview.__init__(self, *args, **kwargs)
 
+        self.locals = self.insert(
+            '', 'end', ':builtins:',
+            text='builtins',
+            open=False,
+        )
+
         self.globals = self.insert(
-            '', 'end', 'globals',
+            '', 'end', ':globals:',
             text='globals',
-            open=True,
+            open=False,
         )
 
         self.locals = self.insert(
-            '', 'end', 'locals',
+            '', 'end', ':locals:',
             text='locals',
             open=True,
         )
 
-        self.locals = self.insert(
-            '', 'end', 'builtins',
-            text='builtins',
-            open=True,
-        )
+        self['columns'] = ('value',)
+        self.column('#0', width=150, anchor='w')
+        self.column('value', width=200, anchor='w')
+        self.heading('#0', text='Name')
+        self.heading('value', text='Value')
 
-    def update_frame(self, frame):
+    def show_frame(self, frame):
         "Update the display of the stack frame"
-        # self.update_builtins(frame['builtins'])
-        # self.update_locals(frame['locals'])
-        # self.update_globals(frame['globals'])
+        self.update_node(':builtins:', frame['builtins'])
+        self.update_node(':globals:', frame['globals'])
+        self.update_node(':locals:', frame['locals'])
+
+    def update_node(self, parent, frame):
+        # Retrieve the current stack list
+        displayed = self.get_children(parent)
+
+        # The next part is a dual iteration: a primary iteration
+        # over all the variables in the frame, with a secondary
+        # iteration over all the current displayed tree nodes.
+        # The iteration finishes when we reach the end of the
+        # primary iteration.
+        display = 0
+        index = 0
+        variables = sorted(frame.items())
+
+        while index < len(variables):
+            name, value = variables[index]
+            node_name = '%s%s' % (parent, name)
+            if display < len(displayed):
+                if node_name == displayed[display]:
+                    # Name matches the expected index.
+                    # Update the existing node value, and
+                    # move to the next displayed index.
+                    self.item(
+                        node_name,
+                        text=name,
+                        values=(value,)
+                    )
+                    index = index + 1
+                    display = display + 1
+                elif node_name > displayed[display]:
+                    # The variable name will sort after the next
+                    # displayed name. This means a variable has
+                    # passed out of scope, and should be deleted.
+                    # Move to the next displayed index.
+                    self.delete(displayed[display])
+                    display = display + 1
+                else:
+                    # The variable name will sort before the next
+                    # displayed name. This means a new variable
+                    # has entered scope and must be added.
+                    self.insert(
+                        parent, index, node_name,
+                        text=name,
+                        values=(value,)
+                    )
+                    index = index + 1
+            else:
+                # There are no more displayed nodes, but there are still
+                # variables in the frame; we add them all to the end
+                self.insert(
+                    parent, 'end', node_name,
+                    text=name,
+                    values=(value,)
+                )
+                index = index + 1
+
+        # Primary iteration has ended, which means we've run out of variables
+        # in the frame. However, there may still be display nodes. Delete
+        # them, because they are stale.
+        for i in range(display, len(displayed)):
+            self.delete(displayed[i])

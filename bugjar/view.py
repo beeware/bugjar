@@ -339,7 +339,12 @@ class MainWindow(object):
         "When a stack frame is selected, highlight the file and line"
         _, index = event.widget.selection()[0].split(':')
         line, frame = self.debugger.stack[int(index)]
+
+        # Display the file in the code view
         self.show_file(filename=frame['filename'], line=line)
+
+        # Display the contents of the selected frame in the inspector
+        self.inspector.show_frame(frame)
 
     def on_breakpoint_selected(self, event):
         "When a breakpoint on the tree has been selected, show the breakpoint"
