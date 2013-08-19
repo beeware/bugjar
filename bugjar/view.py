@@ -8,7 +8,7 @@ from tkFont import *
 from ttk import *
 import tkMessageBox
 
-from bugjar.widgets import DebuggerCode, BreakpointView, StackView
+from bugjar.widgets import DebuggerCode, BreakpointView, StackView, InspectorView
 
 
 class MainWindow(object):
@@ -164,11 +164,6 @@ class MainWindow(object):
         self.stack = StackView(self.stack_frame)
         self.stack.grid(column=0, row=0, sticky=(N, S, E, W))
 
-        self.stack['columns'] = ('line',)
-        self.stack.column('line', width=50, anchor='center')
-        self.stack.heading('#0', text='File')
-        self.stack.heading('line', text='Line')
-
         # # The tree's vertical scrollbar
         self.stack_scrollbar = Scrollbar(self.stack_frame, orient=VERTICAL)
         self.stack_scrollbar.grid(column=1, row=0, sticky=(N, S))
@@ -193,11 +188,6 @@ class MainWindow(object):
 
         self.breakpoint_list = BreakpointView(self.breakpoint_list_frame)
         self.breakpoint_list.grid(column=0, row=0, sticky=(N, S, E, W))
-
-        # self.breakpoint_list['columns'] = ('line',)
-        # self.breakpoint_list.column('line', width=100, anchor='center')
-        self.breakpoint_list.heading('#0', text='File')
-        # self.breakpoint_list.heading('line', text='Line')
 
         # The tree's vertical scrollbar
         self.breakpoint_list_scrollbar = Scrollbar(self.breakpoint_list_frame, orient=VERTICAL)
@@ -238,10 +228,27 @@ class MainWindow(object):
         self.content.add(self.code_frame)
 
     def _setup_inspector(self):
-        self.inspector_tree = Treeview(self.content)
-        self.inspector_tree.grid(column=2, row=0, sticky=(N, S, E, W))
+        self.inspector_frame = Frame(self.content)
+        self.inspector_frame.grid(column=2, row=0, sticky=(N, S, E, W))
 
-        self.content.add(self.inspector_tree)
+        self.inspector = InspectorView(self.inspector_frame)
+        self.inspector.grid(column=0, row=0, sticky=(N, S, E, W))
+
+        # The tree's vertical scrollbar
+        self.inspector_scrollbar = Scrollbar(self.inspector_frame, orient=VERTICAL)
+        self.inspector_scrollbar.grid(column=1, row=0, sticky=(N, S))
+
+        # Tie the scrollbar to the text views, and the text views
+        # to each other.
+        self.inspector.config(yscrollcommand=self.inspector_scrollbar.set)
+        self.inspector_scrollbar.config(command=self.inspector.yview)
+
+        # Setup weights for the "breakpoint list" tree
+        self.inspector_frame.columnconfigure(0, weight=1)
+        self.inspector_frame.columnconfigure(1, weight=0)
+        self.inspector_frame.rowconfigure(0, weight=1)
+
+        self.content.add(self.inspector_frame)
 
     def _setup_status_bar(self):
         # Status bar

@@ -117,7 +117,14 @@ class DebuggerCode(ReadOnlyCode):
 
 class BreakpointView(Treeview):
     def __init__(self, *args, **kwargs):
+        # Only a single stack frame can be selected at a time.
+        kwargs['selectmode'] = 'browse'
         Treeview.__init__(self, *args, **kwargs)
+
+        # self['columns'] = ('line',)
+        # self.column('line', width=100, anchor='center')
+        self.heading('#0', text='File')
+        # self.heading('line', text='Line')
 
         # Set up styles for line numbers
         self.tag_configure('enabled',
@@ -193,6 +200,11 @@ class StackView(Treeview):
         kwargs['selectmode'] = 'browse'
         Treeview.__init__(self, *args, **kwargs)
 
+        self['columns'] = ('line',)
+        self.column('line', width=50, anchor='center')
+        self.heading('#0', text='File')
+        self.heading('line', text='Line')
+
     def update_stack(self, stack):
         "Update the display of the stack"
         # Retrieve the current stack list
@@ -222,3 +234,34 @@ class StackView(Treeview):
         # delete the excess entries.
         for i in range(index, len(displayed)):
             self.delete(displayed[i])
+
+
+class InspectorView(Treeview):
+    def __init__(self, *args, **kwargs):
+        # Only a single stack frame can be selected at a time.
+        kwargs['selectmode'] = 'browse'
+        Treeview.__init__(self, *args, **kwargs)
+
+        self.globals = self.insert(
+            '', 'end', 'globals',
+            text='globals',
+            open=True,
+        )
+
+        self.locals = self.insert(
+            '', 'end', 'locals',
+            text='locals',
+            open=True,
+        )
+
+        self.locals = self.insert(
+            '', 'end', 'builtins',
+            text='builtins',
+            open=True,
+        )
+
+    def update_frame(self, frame):
+        "Update the display of the stack frame"
+        # self.update_builtins(frame['builtins'])
+        # self.update_locals(frame['locals'])
+        # self.update_globals(frame['globals'])
