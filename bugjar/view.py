@@ -267,7 +267,7 @@ class MainWindow(object):
     # Utility methods for controlling content
     ######################################################
 
-    def show_file(self, filename, line=None, breakpoints=None, refresh=False):
+    def show_file(self, filename, line=None, breakpoints=None):
         """Show the content of the nominated file.
 
         If specified, line is the current line number to highlight. If the
@@ -283,17 +283,17 @@ class MainWindow(object):
         else:
             self.current_file.set(filename)
 
-        # Show the contents of the current file
-        file_change = self.code.show(filename=filename, line=line, refresh=refresh)
-
-        # If the file changed, and there are breakpoints for this file,
-        # show them in the file window.
-        if file_change:
+        # Update the code view; this means changing the displayed file
+        # if necessary, and updating the current line.
+        if filename != self.code.filename:
+            self.code.filename = filename
             for bp in self.debugger.breakpoints(filename).values():
                 if bp.enabled:
                     self.code.enable_breakpoint(bp.line)
                 else:
                     self.code.disable_breakpoint(bp.line)
+
+        self.code.line = line
 
     ######################################################
     # TK Main loop
@@ -369,7 +369,7 @@ class MainWindow(object):
         else:
             # No current frame (probably end of execution),
             # so clear the current line marker
-            self.code.clear_current_line()
+            self.code.line = None
 
     def on_line(self, filename, line):
         "A single line of code has been executed"
@@ -410,7 +410,7 @@ class MainWindow(object):
         "A breakpoint has been enabled in the debugger"
         # If the breakpoint is in the currently displayed file, updated
         # the display of the breakpoint.
-        if bp.filename == self.code.current_file:
+        if bp.filename == self.code.filename:
             self.code.enable_breakpoint(bp.line, temporary=bp.temporary)
 
         # ... then update the display of the breakpoint on the tree
@@ -420,7 +420,7 @@ class MainWindow(object):
         "A breakpoint has been disabled in the debugger"
         # If the breakpoint is in the currently displayed file, updated
         # the display of the breakpoint.
-        if bp.filename == self.code.current_file:
+        if bp.filename == self.code.filename:
             self.code.disable_breakpoint(bp.line)
 
         # ... then update the display of the breakpoint on the tree
@@ -430,7 +430,7 @@ class MainWindow(object):
         "A breakpoint has been ignored by the debugger"
         # If the breakpoint is in the currently displayed file, updated
         # the display of the breakpoint.
-        if bp.filename == self.code.current_file:
+        if bp.filename == self.code.filename:
             self.code.ignore_breakpoint(bp.line)
 
         # ... then update the display of the breakpoint on the tree
@@ -440,7 +440,7 @@ class MainWindow(object):
         "A breakpoint has been cleared in the debugger"
         # If the breakpoint is in the currently displayed file, updated
         # the display of the breakpoint.
-        if bp.filename == self.code.current_file:
+        if bp.filename == self.code.filename:
             self.code.clear_breakpoint(bp.line)
 
         # ... then update the display of the breakpoint on the tree

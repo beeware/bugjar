@@ -11,7 +11,8 @@ finally:
     readme.close()
 
 required_pkgs = [
-    'Pygments>=1.5'
+    'Pygments>=1.5',
+    'tkreadonly',
 ]
 if sys.version_info < (2, 7):
     required_pkgs.append('argparse')

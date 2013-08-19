@@ -27,6 +27,9 @@ class DebuggerCode(ReadOnlyCode):
             background='pink'
         )
 
+        self.line_bind('<Double-1>', self.on_line_double_click)
+        self.name_bind('<Double-1>', self.on_name_double_click)
+
     def enable_breakpoint(self, line, temporary=False):
         self.lines.tag_remove('disabled',
             '%s.0' % line,
@@ -91,22 +94,24 @@ class DebuggerCode(ReadOnlyCode):
             '%s.0' % (line + 1)
         )
 
-    def on_line_double_click(self, line):
+    def on_line_double_click(self, event):
         "When a line number is double clicked, set a breakpoint"
-        print "Toggle breakpoint"
         try:
-            bp = self.debugger.breakpoint((self.current_file, line))
+            # If a breakpoint already exists on this line,
+            # find it and toggle it.
+            bp = self.debugger.breakpoint((self.filename, event.line))
             if bp.enabled:
                 self.debugger.disable_breakpoint(bp)
             else:
                 self.debugger.enable_breakpoint(bp)
         except UnknownBreakpoint:
-            self.debugger.create_breakpoint(self.current_file, line)
+            # No breakpoint for this line; create one.
+            self.debugger.create_breakpoint(self.filename, event.line)
         except ConnectionNotBootstrapped:
-            print "Connection not yet configured"
+            print "Connection not configured"
 
-    def on_code_variable_double_click(self, var):
-        "When a variable is double clicked, ..."
+    def on_name_double_click(self, event):
+        "When a code variable is clicked on... do something"
         pass
 
 
