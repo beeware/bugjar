@@ -74,7 +74,7 @@ def command_buffer(debugger):
             # If recv() returns None, the socket has closed
             break
         else:
-            print "NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
+            # print "SERVER NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
             if new_buffer[-1] == debugger.ETX:
                 terminator = new_buffer[-1]
                 full_buffer = remainder + new_buffer[:-1]
@@ -88,14 +88,14 @@ def command_buffer(debugger):
             else:
                 remainder = ''
             for message in messages:
-                print "READ %s bytes" % len(message)
+                # print "READ %s bytes" % len(message)
                 command, args = json.loads(message)
                 try:
                     debugger.commands.put(json.loads(message))
                 except ValueError:
                     print "Invalid command: %s" % message
 
-    print "FINISH PROCESSING COMMAND BUFFER"
+    # print "FINISH PROCESSING SERVER COMMAND BUFFER"
     debugger.commands.put(('close', {}))
 
 
@@ -120,16 +120,18 @@ class Debugger(bdb.Bdb):
 
     def output(self, event, **data):
         try:
-            print "OUTPUT %s byte %s message" % (len(json.dumps((event, data)) + Debugger.ETX), event)
+            # print "OUTPUT %s byte %s message" % (len(json.dumps((event, data)) + Debugger.ETX), event)
             # print json.dumps((event, data))
             self.client.sendall(json.dumps((event, data)) + Debugger.ETX)
         except socket.error, e:
-            traceback.print_exc
-            print "CLIENT ERROR", e
+            pass
+            # print "CLIENT ERROR", e
         except AttributeError:
-            print "No client yet"
+            pass
+            # print "No client yet"
 
     def output_stack(self):
+        "Output the current stack"
         # If this is a normal operational stack frame,
         # the top two frames are BDB and the Bugjar frame
         # that is executing the program.
@@ -160,10 +162,6 @@ class Debugger(bdb.Bdb):
             for frame, line_no in self.stack[str_index:]
         ]
         self.output('stack', stack=stack_data)
-
-    def reset(self):
-        bdb.Bdb.reset(self)
-        self.forget()
 
     def forget(self):
         self.line = None
@@ -229,26 +227,24 @@ class Debugger(bdb.Bdb):
         self.output_stack()
         while 1:
             try:
-                print "Wait for input..."
+                # print "Server Wait for input..."
                 command, args = self.commands.get(block=True)
 
-                print "command:", command, args
+                # print "Server command:", command, args
                 if hasattr(self, 'do_%s' % command):
                     try:
                         resume = getattr(self, 'do_%s' % command)(**args)
                         if resume:
-                            print "resume running"
+                            # print "resume running"
                             break
-                        else:
-                            print "wait for more commands"
                     except (ClientClose, Restart):
                         # Reraise any control exceptions
                         raise
                     except Exception, e:
-                        print "Unknown problem with command %s: %s" % (command, e)
+                        # print "Unknown problem with command %s: %s" % (command, e)
                         self.output('error', message='Unknown problem with command %s: %s' % (command, e))
                 else:
-                    print "Unknown command %s" % command
+                    # print "Unknown command %s" % command
                     self.output('error', message='Unknown command: %s' % command)
 
             except (socket.error, AttributeError, ClientClose):
@@ -265,7 +261,7 @@ class Debugger(bdb.Bdb):
                 self.command_thread.daemon = True
                 self.command_thread.start()
 
-                print "Bootstrap the state of a new connection..."
+                # print "Bootstrap the state of a new connection..."
                 self.output(
                     'bootstrap',
                     breakpoints=[
@@ -281,10 +277,10 @@ class Debugger(bdb.Bdb):
                     ]
                 )
 
-                print "Describe initial stack..."
+                # print "Describe initial stack..."
                 self.output_stack()
 
-        print "END INTERACTION LOOP"
+        # print "END INTERACTION LOOP"
         self.forget()
 
     # Debugger Commands
@@ -486,11 +482,11 @@ class Debugger(bdb.Bdb):
         queue can generate in response to the socket closing; we handle
         it as a user command for the sake of elegance.
         """
-        print "Close down socket"
+        # print "Close down socket"
         self.client = None
-        print "Wait for command thread"
+        # print "Wait for command thread"
         self.command_thread.join()
-        print "Thread is dead"
+        # print "Thread is dead"
         self.commands = None
         raise ClientClose
 
@@ -596,11 +592,11 @@ def main():
 
     while True:
         try:
-            print 'Start the script'
+            # print 'Start the script'
             debugger._runscript(filename)
 
             if debugger._user_requested_quit:
-                print 'user requested exit'
+                # print 'user requested exit'
                 break
 
             debugger.output('restart')
@@ -626,7 +622,7 @@ def main():
             debugger.interaction(None, t)
 
     if debugger.client:
-        print "closing connection"
+        # print "closing connection"
         debugger.client.shutdown(socket.SHUT_WR)
 
 if __name__ == '__main__':

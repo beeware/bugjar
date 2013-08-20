@@ -35,7 +35,7 @@ def command_buffer(debugger):
             # If recv() returns None, the socket has closed
             break
         else:
-            # print "NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
+            # print "CLIENT NEW BUFFER: %s >%s<" % (len(new_buffer), new_buffer[:50])
             if new_buffer[-1] == debugger.ETX:
                 terminator = new_buffer[-1]
                 full_buffer = remainder + new_buffer[:-1]
@@ -57,7 +57,7 @@ def command_buffer(debugger):
                 else:
                     print "Unknown server event:", event
 
-    # print "FINISH PROCESSING COMMAND BUFFER"
+    # print "FINISH PROCESSING CLIENT COMMAND BUFFER"
 
 
 class Debugger(object):
@@ -95,14 +95,14 @@ class Debugger(object):
         "Shut down the debugger session"
         if self.proc is not None:
             # If this is a local debugger session, kill the child process.
-            self.socket.sendall('quit')
+            self.output('quit')
 
         self.socket.shutdown(socket.SHUT_WR)
 
         if self.proc is not None:
             # If this is a local debugger session, wait for
             # the child process to die.
-            print "Waiting for child process to die..."
+            # print "Waiting for child process to die..."
             self.proc.wait()
 
     def output(self, event, **data):
