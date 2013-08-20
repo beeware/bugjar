@@ -57,7 +57,7 @@ def command_buffer(debugger):
                 else:
                     print "Unknown server event:", event
 
-    print "FINISH PROCESSING COMMAND BUFFER"
+    # print "FINISH PROCESSING COMMAND BUFFER"
 
 
 class Debugger(object):
@@ -237,6 +237,9 @@ class Debugger(object):
 
     def on_line(self, filename, line):
         self.view.on_line(filename, line)
+
+    def on_exception(self, name, value):
+        self.view.on_exception(name=name, value=value)
 
     def on_info(self, message):
         self.view.on_info(message=message)

@@ -395,11 +395,11 @@ class MainWindow(object):
         "A callable has returned"
         self.run_status.set('Return: %s' % retval)
 
-    def on_exception(self, **kwargs):
+    def on_exception(self, name, value):
         "An exception has been raised"
         print "EXCEPTION FOUND"
-        print kwargs
-        self.run_status.set('Exception')
+        self.run_status.set('Exception: %s - %s' % (name, value))
+        tkMessageBox.showwarning(message='%s: %s' % (name, value))
 
     def on_restart(self):
         "The code has finished running, and will start again"

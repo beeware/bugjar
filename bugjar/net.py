@@ -25,13 +25,18 @@ from threading import Thread
 import traceback
 
 try:
-    from Queue import Queue, Empty
+    from Queue import Queue
 except ImportError:
-    from queue import Queue, Empty  # python 3.x
+    from queue import Queue  # python 3.x
 
 
 class Restart(Exception):
     """Causes a debugger to be restarted for the debugged python program."""
+    pass
+
+
+class ClientClose(Exception):
+    """Causes a debugger to wait for a new debugger client to connect."""
     pass
 
 
@@ -115,13 +120,34 @@ class Debugger(bdb.Bdb):
 
     def output(self, event, **data):
         try:
-            print "OUTPUT %s byte message" % len(json.dumps((event, data)) + Debugger.ETX)
+            print "OUTPUT %s byte %s message" % (len(json.dumps((event, data)) + Debugger.ETX), event)
             self.client.sendall(json.dumps((event, data)) + Debugger.ETX)
         except socket.error, e:
             traceback.print_exc
             print "CLIENT ERROR", e
         except AttributeError:
             print "No client yet"
+
+    def output_stack(self):
+        stack_data = [
+            (
+                line_no,
+                {
+                    'filename': frame.f_code.co_filename,
+                    'locals': dict((k, repr(v)) for k, v in frame.f_locals.items()),
+                    'globals': dict((k, repr(v)) for k, v in frame.f_globals.items()),
+                    'builtins': dict((k, repr(v)) for k, v in frame.f_builtins.items()),
+                    'restricted': frame.f_restricted,
+                    'lasti': repr(frame.f_lasti),
+                    'exc_type': repr(frame.f_exc_type),
+                    'exc_value': repr(frame.f_exc_value),
+                    'exc_traceback': repr(frame.f_exc_traceback),
+                    'current': frame is self.curframe,
+                }
+            )
+            for frame, line_no in self.stack[2:]
+        ]
+        self.output('stack', stack=stack_data)
 
     def reset(self):
         bdb.Bdb.reset(self)
@@ -182,17 +208,16 @@ class Debugger(bdb.Bdb):
         else:
             exc_type_name = exc_type.__name__
         self.output('exception', name=exc_type_name, value=repr(exc_value))
+        self.output_stack()
         self.interaction(frame, exc_traceback)
 
     # General interaction function
 
     def interaction(self, frame, tb):
         self.setup(frame, tb)
+        self.output_stack()
         while 1:
             try:
-                print "Update client state..."
-                self.print_stack_entry(self.stack[self.curindex])
-
                 print "Wait for input..."
                 command, args = self.commands.get(block=True)
 
@@ -205,6 +230,9 @@ class Debugger(bdb.Bdb):
                             break
                         else:
                             print "wait for more commands"
+                    except (ClientClose, Restart):
+                        # Reraise any control exceptions
+                        raise
                     except Exception, e:
                         print "Unknown problem with command %s: %s" % (command, e)
                         self.output('error', message='Unknown problem with command %s: %s' % (command, e))
@@ -212,7 +240,7 @@ class Debugger(bdb.Bdb):
                     print "Unknown command %s" % command
                     self.output('error', message='Unknown command: %s' % command)
 
-            except (socket.error, AttributeError):
+            except (socket.error, AttributeError, ClientClose):
                 # Problem with connection; look for new client
                 print "Listening on %s:%s for a controller client" % (self.host, self.port)
                 client, addr = self.socket.accept()
@@ -227,7 +255,9 @@ class Debugger(bdb.Bdb):
                 self.command_thread.start()
 
                 print "Bootstrap the state of a new connection..."
-                self.output('bootstrap', breakpoints=[
+                self.output(
+                    'bootstrap',
+                    breakpoints=[
                         {
                             'bpnum': bp.number,
                             'filename': bp.file,
@@ -237,7 +267,11 @@ class Debugger(bdb.Bdb):
                             'funcname': bp.funcname
                         }
                         for bp in bdb.Breakpoint.bpbynumber[1:]
-                    ])
+                    ]
+                )
+
+                print "Describe initial stack..."
+                self.output_stack()
 
         print "END INTERACTION LOOP"
         self.forget()
@@ -253,7 +287,8 @@ class Debugger(bdb.Bdb):
                 self.output('error', message=err)
             else:
                 bp = self.get_breaks(filename, line)[-1]
-                self.output('breakpoint_create',
+                self.output(
+                    'breakpoint_create',
                     bpnum=bp.number,
                     filename=bp.file,
                     line=bp.line,
@@ -356,7 +391,7 @@ class Debugger(bdb.Bdb):
     #         self.curindex = self.curindex - 1
     #         self.curframe = self.stack[self.curindex][0]
     #         self.curframe_locals = self.curframe.f_locals
-    #         self.print_stack_entry(self.stack[self.curindex])
+    #         self.output_stack()
     #         self.lineno = None
 
     # def do_down(self, arg):
@@ -366,7 +401,7 @@ class Debugger(bdb.Bdb):
     #         self.curindex = self.curindex + 1
     #         self.curframe = self.stack[self.curindex][0]
     #         self.curframe_locals = self.curframe.f_locals
-    #         self.print_stack_entry(self.stack[self.curindex])
+    #         self.output_stack()
     #         self.lineno = None
 
     # def do_until(self, arg):
@@ -412,7 +447,7 @@ class Debugger(bdb.Bdb):
     #             # new position
     #             self.curframe.f_lineno = arg
     #             self.stack[self.curindex] = self.stack[self.curindex][0], arg
-    #             self.print_stack_entry(self.stack[self.curindex])
+    #             self.output_stack()
     #         except ValueError, e:
     #             self.output('error', message="Jump failed: %s" % e)
 
@@ -446,7 +481,7 @@ class Debugger(bdb.Bdb):
         self.command_thread.join()
         print "Thread is dead"
         self.commands = None
-        return 1
+        raise ClientClose
 
     # def do_args(self, arg):
     #     co = self.curframe.f_code
@@ -485,36 +520,6 @@ class Debugger(bdb.Bdb):
     #     except:
     #         pass
     # do_p = do_print
-
-    # Print a traceback starting at the top stack frame.
-    # The most recently entered frame is printed last;
-    # this is different from dbx and gdb, but consistent with
-    # the Python interpreter's stack trace.
-    # It is also consistent with the up/down commands (which are
-    # compatible with dbx and gdb: up moves towards 'main()'
-    # and down moves towards the most recent stack frame).
-
-    def print_stack_entry(self, frame_lineno, prompt_prefix='>'):
-        # frame, lineno = frame_lineno
-        # self.output(self.format_stack_entry(frame_lineno, prompt_prefix))
-
-        stack_data = [
-            (line_no, {
-                    'filename': frame.f_code.co_filename,
-                    'locals': dict((k, repr(v)) for k, v in frame.f_locals.items()),
-                    'globals': dict((k, repr(v)) for k, v in frame.f_globals.items()),
-                    'builtins': dict((k, repr(v)) for k, v in frame.f_builtins.items()),
-                    'restricted': frame.f_restricted,
-                    'lasti': repr(frame.f_lasti),
-                    'exc_type': repr(frame.f_exc_type),
-                    'exc_value': repr(frame.f_exc_value),
-                    'exc_traceback': repr(frame.f_exc_traceback),
-                    'current': frame is self.curframe,
-                }
-            )
-            for frame, line_no in self.stack[2:]
-        ]
-        self.output('stack', stack=stack_data)
 
     def _runscript(self, filename):
         # The script has to run in __main__ namespace (or imports from
@@ -609,7 +614,7 @@ def main():
             print "Running 'cont' or 'step' will restart the program"
             t = sys.exc_info()[2]
             debugger.interaction(None, t)
-            print "Post mortem debugger finished. The " + filename + \
+            print "Post mortem debugger finished. " + filename + \
                   " will be restarted"
             break
 
