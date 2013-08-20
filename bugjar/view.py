@@ -397,9 +397,13 @@ class MainWindow(object):
 
     def on_exception(self, name, value):
         "An exception has been raised"
-        print "EXCEPTION FOUND"
         self.run_status.set('Exception: %s - %s' % (name, value))
         tkMessageBox.showwarning(message='%s: %s' % (name, value))
+
+    def on_postmortem(self):
+        "An exception has been raised"
+        self.run_status.set('Post mortem mode')
+        tkMessageBox.showerror(message='Entering post mortem mode. Step/Next will restart')
 
     def on_restart(self):
         "The code has finished running, and will start again"

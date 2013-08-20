@@ -121,6 +121,7 @@ class Debugger(bdb.Bdb):
     def output(self, event, **data):
         try:
             print "OUTPUT %s byte %s message" % (len(json.dumps((event, data)) + Debugger.ETX), event)
+            # print json.dumps((event, data))
             self.client.sendall(json.dumps((event, data)) + Debugger.ETX)
         except socket.error, e:
             traceback.print_exc
@@ -129,6 +130,17 @@ class Debugger(bdb.Bdb):
             print "No client yet"
 
     def output_stack(self):
+        # If this is a normal operational stack frame,
+        # the top two frames are BDB and the Bugjar frame
+        # that is executing the program.
+        # If this is an exception, there are 2 extra frames
+        # from the Bugjar net.
+        # All these frames can be ignored.
+        if self.stack[1][0].f_code.co_filename == '<string>':
+            str_index = 2
+        elif self.stack[3][0].f_code.co_filename == '<string>':
+            str_index = 4
+
         stack_data = [
             (
                 line_no,
@@ -145,7 +157,7 @@ class Debugger(bdb.Bdb):
                     'current': frame is self.curframe,
                 }
             )
-            for frame, line_no in self.stack[2:]
+            for frame, line_no in self.stack[str_index:]
         ]
         self.output('stack', stack=stack_data)
 
@@ -208,7 +220,6 @@ class Debugger(bdb.Bdb):
         else:
             exc_type_name = exc_type.__name__
         self.output('exception', name=exc_type_name, value=repr(exc_value))
-        self.output_stack()
         self.interaction(frame, exc_traceback)
 
     # General interaction function
@@ -610,13 +621,9 @@ def main():
             break
         except:
             traceback.print_exc()
-            print "Uncaught exception. Entering post mortem debugging"
-            print "Running 'cont' or 'step' will restart the program"
+            debugger.output('postmortem')
             t = sys.exc_info()[2]
             debugger.interaction(None, t)
-            print "Post mortem debugger finished. " + filename + \
-                  " will be restarted"
-            break
 
     if debugger.client:
         print "closing connection"

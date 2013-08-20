@@ -241,6 +241,9 @@ class Debugger(object):
     def on_exception(self, name, value):
         self.view.on_exception(name=name, value=value)
 
+    def on_postmortem(self):
+        self.view.on_postmortem()
+
     def on_info(self, message):
         self.view.on_info(message=message)
 
