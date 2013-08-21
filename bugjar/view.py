@@ -13,6 +13,21 @@ import webbrowser
 from bugjar.widgets import DebuggerCode, BreakpointView, StackView, InspectorView
 
 
+def filename_normalizer(base_path):
+    """Generate a fuction that will normalize a full path into a
+    display name, by removing a common prefix.
+
+    In most situations, this will be removing the current working
+    directory.
+    """
+    def _normalizer(filename):
+        if filename.startswith(base_path):
+            return filename[len(base_path):]
+        else:
+            return filename
+    return _normalizer
+
+
 class MainWindow(object):
     def __init__(self, root, debugger):
         '''
@@ -32,8 +47,12 @@ class MainWindow(object):
 
         '''
 
-        self.base_path = os.path.abspath(os.getcwd())
-        self.base_path = os.path.normcase(self.base_path) + '/'
+        # Obtain and expand the current working directory.
+        base_path = os.path.abspath(os.getcwd())
+        base_path = os.path.normcase(base_path) + '/'
+
+        # Create a filename normalizer based on the CWD.
+        self.filename_normalizer = filename_normalizer(base_path)
 
         self.debugger = debugger
         # Associate the debugger with this view.
@@ -171,7 +190,7 @@ class MainWindow(object):
         self.stack_frame.grid(column=0, row=0, sticky=(N, S, E, W))
         self.file_notebook.add(self.stack_frame, text='Stack')
 
-        self.stack = StackView(self.stack_frame)
+        self.stack = StackView(self.stack_frame, normalizer=self.filename_normalizer)
         self.stack.grid(column=0, row=0, sticky=(N, S, E, W))
 
         # # The tree's vertical scrollbar
@@ -196,7 +215,7 @@ class MainWindow(object):
         self.breakpoints_frame.grid(column=0, row=0, sticky=(N, S, E, W))
         self.file_notebook.add(self.breakpoints_frame, text='Breakpoints')
 
-        self.breakpoints = BreakpointView(self.breakpoints_frame)
+        self.breakpoints = BreakpointView(self.breakpoints_frame, normalizer=self.filename_normalizer)
         self.breakpoints.grid(column=0, row=0, sticky=(N, S, E, W))
 
         # The tree's vertical scrollbar
@@ -296,10 +315,7 @@ class MainWindow(object):
         If refresh is true, the file will be reloaded and redrawn.
         """
         # Set the filename label for the current file
-        if filename.startswith(self.base_path):
-            self.current_file.set(filename[len(self.base_path):])
-        else:
-            self.current_file.set(filename)
+        self.current_file.set(self.filename_normalizer(filename))
 
         # Update the code view; this means changing the displayed file
         # if necessary, and updating the current line.

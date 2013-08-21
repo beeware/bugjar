@@ -122,6 +122,7 @@ class BreakpointView(Treeview):
     def __init__(self, *args, **kwargs):
         # Only a single stack frame can be selected at a time.
         kwargs['selectmode'] = 'browse'
+        self.normalizer = kwargs.pop('normalizer')
         Treeview.__init__(self, *args, **kwargs)
 
         # self['columns'] = ('line',)
@@ -148,7 +149,7 @@ class BreakpointView(Treeview):
             # Now insert a new node at the index that was found.
             self.insert(
                 '', index, filename,
-                text=filename,
+                text=self.normalizer(filename),
                 open=True,
                 tags=['file']
             )
@@ -194,6 +195,7 @@ class StackView(Treeview):
     def __init__(self, *args, **kwargs):
         # Only a single stack frame can be selected at a time.
         kwargs['selectmode'] = 'browse'
+        self.normalizer = kwargs.pop('normalizer')
         Treeview.__init__(self, *args, **kwargs)
 
         self['columns'] = ('line',)
@@ -214,13 +216,13 @@ class StackView(Treeview):
             if index < len(displayed):
                 self.item(
                     displayed[index],
-                    text=frame['filename'],
+                    text=self.normalizer(frame['filename']),
                     values=(line,)
                 )
             else:
                 self.insert(
                     '', index, 'frame:%s' % index,
-                    text=frame['filename'],
+                    text=self.normalizer(frame['filename']),
                     open=True,
                     values=(line,)
                 )
