@@ -13,7 +13,6 @@ License terms for the original PDB code can be found here:
     http://docs.python.org/2/license.html
 """
 
-import argparse
 import bdb
 import linecache
 import json
@@ -249,7 +248,7 @@ class Debugger(bdb.Bdb):
 
             except (socket.error, AttributeError, ClientClose):
                 # Problem with connection; look for new client
-                print "Listening on %s:%s for a controller client" % (self.host, self.port)
+                print "Listening on %s:%s for a bugjar client" % (self.host, self.port)
                 client, addr = self.socket.accept()
 
                 print "Got connection from", client.getpeername()
@@ -553,30 +552,10 @@ class Debugger(bdb.Bdb):
         self.run('execfile(%r)' % filename)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--version", help="Display version number and exit", action="store_true")
-    parser.add_argument("--host", help="server host", action="store", default="")
-    parser.add_argument("-p", "--port", help="Port number", action="store", type=int, default=3742)
-    parser.add_argument('mainpyfile')
-    parser.add_argument('args', nargs=argparse.REMAINDER)
-
-    options = parser.parse_args()
-
-    # Check the shortcut options
-    if options.version:
-        import bugjar
-        print bugjar.VERSION
-        return
-
-    # Convert the filename provided on the command line into a canonical form
-    filename = os.path.abspath(options.mainpyfile)
-    filename = os.path.normcase(filename)
-
+def run(hostname, port, filename, *args):
     # Hide "debugger.py" from argument list
     sys.argv[0] = filename
-    sys.argv[1:] = options.args
+    sys.argv[1:] = args
 
     # Replace debugger's dir with script's dir in front of module search path.
     sys.path[0] = os.path.dirname(filename)
@@ -585,10 +564,10 @@ def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-    s.bind((options.host, options.port))
+    s.bind((hostname, port))
     s.listen(1)
 
-    debugger = Debugger(s, options.host, options.port)
+    debugger = Debugger(s, hostname, port)
 
     while True:
         try:
@@ -624,7 +603,3 @@ def main():
     if debugger.client:
         # print "closing connection"
         debugger.client.shutdown(socket.SHUT_WR)
-
-if __name__ == '__main__':
-    from bugjar import net
-    net.main()

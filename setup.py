@@ -32,8 +32,9 @@ setup(
     scripts=[],
     entry_points={
         'console_scripts': [
-            'bugjar = bugjar.jar:local',
-            'bugjar-remote = bugjar.jar:remote'
+            'bugjar = bugjar.main:local',
+            'bugjar-jar = bugjar.main:jar',
+            'bugjar-net = bugjar.main:net',
         ]
     },
     license='New BSD',
