@@ -363,7 +363,7 @@ class MainWindow(object):
 
     def cmd_open_file(self, event=None):
         "Open a file in the breakpoint pane"
-        filename = tkFileDialog.askopenfilename()
+        filename = tkFileDialog.askopenfilename(initialdir=os.path.abspath(os.getcwd()))
 
         if filename:
             # Convert to canonical form
