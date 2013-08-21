@@ -8,6 +8,7 @@ from tkFont import *
 from ttk import *
 import tkMessageBox
 import tkFileDialog
+import webbrowser
 
 from bugjar.widgets import DebuggerCode, BreakpointView, StackView, InspectorView
 
@@ -83,8 +84,8 @@ class MainWindow(object):
         self.menu_program = Menu(self.menubar)
         self.menubar.add_cascade(menu=self.menu_program, label='Program')
 
-        # self.menu_help = Menu(self.menubar, name='help')
-        # self.menubar.add_cascade(menu=self.menu_help)
+        self.menu_help = Menu(self.menubar)
+        self.menubar.add_cascade(menu=self.menu_help, label='Help')
 
         # self.menu_Apple.add_command(label='Test', command=self.cmd_dummy)
 
@@ -102,7 +103,9 @@ class MainWindow(object):
         self.menu_program.add_command(label='Return', command=self.cmd_return, accelerator="BackSpace")
         self.root.bind('<BackSpace>', self.cmd_return)
 
-        # self.menu_help.add_command(label='Test', command=self.cmd_dummy)
+        self.menu_help.add_command(label='Open Documentation', command=self.cmd_bugjar_docs)
+        self.menu_help.add_command(label='Open Bugjar project page', command=self.cmd_bugjar_page)
+        self.menu_help.add_command(label='Open Bugjar on GitHub', command=self.cmd_bugjar_github)
 
         # last step - configure the menubar
         self.root['menu'] = self.menubar
@@ -326,20 +329,23 @@ class MainWindow(object):
         self.root.quit()
 
     def cmd_run(self, *args):
-        ""
+        "Run until the next breakpoint, or end of execution"
         self.debugger.do_run()
 
     def cmd_step(self, *args):
+        "Step into the next line of code"
         self.debugger.do_step()
 
     def cmd_next(self, *args):
+        "Run the next line of code in the current frame"
         self.debugger.do_next()
 
     def cmd_return(self, *args):
+        "Return to the previous frame"
         self.debugger.do_return()
 
     def cmd_open_file(self, *args):
-        "The user has requested a specfic file"
+        "Open a file in"
         filename = tkFileDialog.askopenfilename()
 
         if filename:
@@ -352,6 +358,18 @@ class MainWindow(object):
 
             # Ensure the file appears on the breakpoint list
             self.breakpoint_list.insert_filename(filename)
+
+    def cmd_bugjar_page(self):
+        "Show the Bugjar project page"
+        webbrowser.open_new('http://pybee.org/bugjar')
+
+    def cmd_bugjar_github(self):
+        "Show the Bugjar GitHub repo"
+        webbrowser.open_new('http://github.com/pybee/bugjar')
+
+    def cmd_bugjar_docs(self):
+        "Show the Bugjar documentation"
+        webbrowser.open_new('http://pybee.org/bugjar')
 
     ######################################################
     # Handlers for GUI actions
