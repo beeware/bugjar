@@ -31,7 +31,7 @@ def jar_run(debugger):
 def local():
     "Run a Bugjar session on a local process"
     parser = argparse.ArgumentParser(
-        description='Debug a python script using a GUI.',
+        description='Debug a python script with a graphical interface.',
         version=VERSION
     )
 
@@ -65,7 +65,7 @@ def local():
 def jar():
     "Connect a Bugjar GUI to a remote headless session."
     parser = argparse.ArgumentParser(
-        description='Debug a python script using a GUI.',
+        description='Connect a Bugjar GUI session to a headless debugger.',
         version=VERSION
     )
 
@@ -84,7 +84,7 @@ def jar():
 def net():
     "Create a headless Bugjar session."
     parser = argparse.ArgumentParser(
-        description='Debug a python script using a GUI.',
+        description='Run a script inside a headless Bugjar session.',
         version=VERSION
     )
 
