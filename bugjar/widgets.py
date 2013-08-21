@@ -135,26 +135,30 @@ class BreakpointView(Treeview):
         self.tag_configure('ignored', foreground='green')
         self.tag_configure('temporary', foreground='pink')
 
-    def update_breakpoint(self, bp):
-        """Update the visualization of a breakpoint in the tree.
-
-        If the breakpoint isn't arlready on the tree, add it.
-        """
-        if not self.exists(bp.filename):
+    def insert_filename(self, filename):
+        "Ensure that a specific filename exists in the breakpoint tree"
+        if not self.exists(filename):
             # First, establish the index at which to insert this child.
             # Do this by getting a list of children, sorting the list by name
             # and then finding how many would sort less than the label for
             # this node.
             files = sorted(self.get_children(''), reverse=False)
-            index = len([item for item in files if item > bp.filename])
+            index = len([item for item in files if item > filename])
 
             # Now insert a new node at the index that was found.
             self.insert(
-                '', index, bp.filename,
-                text=bp.filename,
+                '', index, filename,
+                text=filename,
                 open=True,
                 tags=['file']
             )
+
+    def update_breakpoint(self, bp):
+        """Update the visualization of a breakpoint in the tree.
+
+        If the breakpoint isn't arlready on the tree, add it.
+        """
+        self.insert_filename(bp.filename)
 
         # Determine the right tag for the line number
         if bp.enabled:

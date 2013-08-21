@@ -7,6 +7,7 @@ from Tkinter import *
 from tkFont import *
 from ttk import *
 import tkMessageBox
+import tkFileDialog
 
 from bugjar.widgets import DebuggerCode, BreakpointView, StackView, InspectorView
 
@@ -45,9 +46,9 @@ class MainWindow(object):
         # Prevent the menus from having the empty tearoff entry
         self.root.option_add('*tearOff', FALSE)
         # Catch the close button
-        self.root.protocol("WM_DELETE_WINDOW", self.on_quit)
+        self.root.protocol("WM_DELETE_WINDOW", self.cmd_quit)
         # Catch the "quit" event.
-        self.root.createcommand('exit', self.on_quit)
+        self.root.createcommand('exit', self.cmd_quit)
 
         # Setup the menu
         self._setup_menubar()
@@ -79,8 +80,8 @@ class MainWindow(object):
         self.menu_file = Menu(self.menubar)
         self.menubar.add_cascade(menu=self.menu_file, label='File')
 
-        self.menu_edit = Menu(self.menubar)
-        self.menubar.add_cascade(menu=self.menu_edit, label='Edit')
+        self.menu_program = Menu(self.menubar)
+        self.menubar.add_cascade(menu=self.menu_program, label='Program')
 
         # self.menu_help = Menu(self.menubar, name='help')
         # self.menubar.add_cascade(menu=self.menu_help)
@@ -88,12 +89,18 @@ class MainWindow(object):
         # self.menu_Apple.add_command(label='Test', command=self.cmd_dummy)
 
         # self.menu_file.add_command(label='New', command=self.cmd_dummy, accelerator="Command-N")
-        # self.menu_file.add_command(label='Open...', command=self.cmd_dummy)
+        self.menu_file.add_command(label='Open...', command=self.cmd_open_file, accelerator="Command-O")
+        self.root.bind('<Command-o>', self.cmd_open_file)
         # self.menu_file.add_command(label='Close', command=self.cmd_dummy)
 
-        # self.menu_edit.add_command(label='New', command=self.cmd_dummy)
-        # self.menu_edit.add_command(label='Open...', command=self.cmd_dummy)
-        # self.menu_edit.add_command(label='Close', command=self.cmd_dummy)
+        self.menu_program.add_command(label='Run', command=self.cmd_run, accelerator="R")
+        self.root.bind('<r>', self.cmd_run)
+        self.menu_program.add_command(label='Step', command=self.cmd_step, accelerator="S")
+        self.root.bind('<s>', self.cmd_step)
+        self.menu_program.add_command(label='Next', command=self.cmd_next, accelerator="N")
+        self.root.bind('<n>', self.cmd_next)
+        self.menu_program.add_command(label='Return', command=self.cmd_return, accelerator="BackSpace")
+        self.root.bind('<BackSpace>', self.cmd_return)
 
         # self.menu_help.add_command(label='Test', command=self.cmd_dummy)
 
@@ -313,23 +320,38 @@ class MainWindow(object):
     # TK Command handlers
     ######################################################
 
-    def on_quit(self):
+    def cmd_quit(self):
         "Quit the debugger"
         self.debugger.stop()
         self.root.quit()
 
-    def cmd_run(self):
+    def cmd_run(self, *args):
         ""
         self.debugger.do_run()
 
-    def cmd_step(self):
+    def cmd_step(self, *args):
         self.debugger.do_step()
 
-    def cmd_next(self):
+    def cmd_next(self, *args):
         self.debugger.do_next()
 
-    def cmd_return(self):
+    def cmd_return(self, *args):
         self.debugger.do_return()
+
+    def cmd_open_file(self, *args):
+        "The user has requested a specfic file"
+        filename = tkFileDialog.askopenfilename()
+
+        if filename:
+            # Convert to canonical form
+            filename = os.path.abspath(filename)
+            filename = os.path.normcase(filename)
+
+            # Show the file contents
+            self.code.filename = filename
+
+            # Ensure the file appears on the breakpoint list
+            self.breakpoint_list.insert_filename(filename)
 
     ######################################################
     # Handlers for GUI actions
