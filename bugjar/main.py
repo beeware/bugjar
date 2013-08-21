@@ -35,10 +35,25 @@ def local():
         version=VERSION
     )
 
-    parser.add_argument("-p", "--port", metavar='PORT', help="Port number to use for debugger communications (default=3742)", action="store", type=int, default=3742, dest="port")
+    parser.add_argument(
+        "-p", "--port",
+        metavar='PORT',
+        help="Port number to use for debugger communications (default=3742)",
+        action="store",
+        type=int,
+        default=3742,
+        dest="port"
+    )
 
-    parser.add_argument('filename', metavar='script.py', help='The script to debug.')
-    parser.add_argument('args', nargs=argparse.REMAINDER, help='Arguments to pass to the script you are debugging.')
+    parser.add_argument(
+        'filename',
+        metavar='script.py',
+        help='The script to debug.'
+    )
+    parser.add_argument(
+        'args', nargs=argparse.REMAINDER,
+        help='Arguments to pass to the script you are debugging.'
+    )
 
     options = parser.parse_args()
 
@@ -69,8 +84,22 @@ def jar():
         version=VERSION
     )
 
-    parser.add_argument("-H", "--host", metavar='HOSTNAME', help="Hostname/IP address where the headless debugger is running (default=localhost)", action="store", default="localhost", dest="hostname")
-    parser.add_argument("-p", "--port", metavar='PORT', help="Port number where where the headless debugger is running (default=3742)", action="store", type=int, default=3742, dest="port")
+    parser.add_argument(
+        "-H", "--host",
+        metavar='HOSTNAME',
+        help="Hostname/IP address where the headless debugger is running (default=localhost)",
+        action="store",
+        default="localhost",
+        dest="hostname")
+    parser.add_argument(
+        "-p", "--port",
+        metavar='PORT',
+        help="Port number where where the headless debugger is running (default=3742)",
+        action="store",
+        type=int,
+        default=3742,
+        dest="port"
+    )
 
     options = parser.parse_args()
 
@@ -88,11 +117,31 @@ def net():
         version=VERSION
     )
 
-    parser.add_argument("-H", "--host", metavar='HOSTNAME', help="Hostname/IP address where the headless debugger is running (default=localhost)", action="store", default="localhost", dest="hostname")
-    parser.add_argument("-p", "--port", metavar='PORT', help="Port number where where the headless debugger is running (default=3742)", action="store", type=int, default=3742, dest="port")
-
-    parser.add_argument('filename', metavar='script.py', help='The script to debug.')
-    parser.add_argument('args', nargs=argparse.REMAINDER, help='Arguments to pass to the script you are debugging.')
+    parser.add_argument(
+        "-H", "--host",
+        metavar='HOSTNAME',
+        help="Hostname/IP address where the headless debugger will listen for connections (default=0.0.0.0)",
+        action="store",
+        default="0.0.0.0",
+        dest="hostname")
+    parser.add_argument(
+        "-p", "--port",
+        metavar='PORT',
+        help="Port number where the headless debugger will listen for connections (default=3742)",
+        action="store",
+        type=int,
+        default=3742,
+        dest="port"
+    )
+    parser.add_argument(
+        'filename',
+        metavar='script.py',
+        help='The script to debug.'
+    )
+    parser.add_argument(
+        'args', nargs=argparse.REMAINDER,
+        help='Arguments to pass to the script you are debugging.'
+    )
 
     options = parser.parse_args()
 
