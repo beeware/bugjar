@@ -329,23 +329,23 @@ class MainWindow(object):
         self.debugger.stop()
         self.root.quit()
 
-    def cmd_run(self, *args):
+    def cmd_run(self, event=None):
         "Run until the next breakpoint, or end of execution"
         self.debugger.do_run()
 
-    def cmd_step(self, *args):
+    def cmd_step(self, event=None):
         "Step into the next line of code"
         self.debugger.do_step()
 
-    def cmd_next(self, *args):
+    def cmd_next(self, event=None):
         "Run the next line of code in the current frame"
         self.debugger.do_next()
 
-    def cmd_return(self, *args):
+    def cmd_return(self, event=None):
         "Return to the previous frame"
         self.debugger.do_return()
 
-    def cmd_open_file(self, *args):
+    def cmd_open_file(self, event=None):
         "Open a file in the breakpoint pane"
         filename = tkFileDialog.askopenfilename()
 
