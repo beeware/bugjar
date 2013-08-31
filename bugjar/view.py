@@ -126,6 +126,7 @@ class MainWindow(object):
         self.menu_help.add_command(label='Open Documentation', command=self.cmd_bugjar_docs)
         self.menu_help.add_command(label='Open Bugjar project page', command=self.cmd_bugjar_page)
         self.menu_help.add_command(label='Open Bugjar on GitHub', command=self.cmd_bugjar_github)
+        self.menu_help.add_command(label='Open BeeWare project page', command=self.cmd_beeware_page)
 
         # last step - configure the menubar
         self.root['menu'] = self.menubar
@@ -402,6 +403,10 @@ class MainWindow(object):
             webbrowser.open_new('http://bugjar.readthedocs.org/en/v%s/' % VERSION)
         else:
             webbrowser.open_new('http://bugjar.readthedocs.org/')
+
+    def cmd_beeware_page(self):
+        "Show the BeeWare project page"
+        webbrowser.open_new('http://pybee.org/')
 
     ######################################################
     # Handlers for GUI actions
