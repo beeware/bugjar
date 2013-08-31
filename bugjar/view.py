@@ -10,6 +10,7 @@ import tkMessageBox
 import tkFileDialog
 import webbrowser
 
+from bugjar import VERSION, NUM_VERSION
 from bugjar.widgets import DebuggerCode, BreakpointView, StackView, InspectorView
 
 
@@ -395,7 +396,12 @@ class MainWindow(object):
 
     def cmd_bugjar_docs(self):
         "Show the Bugjar documentation"
-        webbrowser.open_new('http://pybee.org/bugjar')
+        # If this is a formal release, show the docs for that
+        # version. otherwise, just show the head docs.
+        if len(NUM_VERSION) == 3:
+            webbrowser.open_new('http://bugjar.readthedocs.org/en/v%s/' % VERSION)
+        else:
+            webbrowser.open_new('http://bugjar.readthedocs.org/')
 
     ######################################################
     # Handlers for GUI actions
