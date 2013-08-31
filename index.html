@@ -14,8 +14,9 @@
       }
       header h1 {
         font-family: 'Cutive', serif;
-        font-size: 72px;
+        font-size: 64px;
         padding-top: 12px;
+        text-align: center;
       }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
@@ -35,10 +36,9 @@
       <header>
         <img src="static/images/bugjar-270.png" alt="bugjar logo">
         <h1>bugjar</h1>
-        <p>A interactive graphical debugger for Python code.</p>
+        <p>A interactive graphical debugger for Python code. Part of the <a href="http://pybee.org/">BeeWare suite</a>.</p>
 
         <p class="view"><a href="https://github.com/pybee/bugjar">View the Project on GitHub <small>pybee/bugjar</small></a></p>
-
 
         <ul>
           <li><a href="https://github.com/pybee/bugjar/zipball/master">Download <strong>ZIP File</strong></a></li>
@@ -47,10 +47,71 @@
         </ul>
       </header>
       <section>
-        <h1>
-<a name="bugjar" class="anchor" href="#bugjar"><span class="octicon octicon-link"></span></a>bugjar</h1>
+        <h1><a name="bugjar" class="anchor" href="#bugjar"></a>bugjar</h1>
 
-<p>A interactive graphical debugger for Python code.</p>
+<p><strong>Part of the <a href="http://pybee.org"><img src="static/images/brutus-16.png" alt="BeeWare logo">BeeWare suite</a>.</strong></p>
+
+<p>Anyone who learned to code in the mid to late 80s probably spent some
+time with a Borland compiler -- probably either Turbo Pascal or Turbo C.
+One of the best features of the Turbo compilers was their IDE -- and
+in particular, a really good visual debugger that would let you inspect
+code while it was running.</p>
+
+<p>Then we all moved to Unix, and somehow forgot what a good debugger was.
+GDB is perfectly functional, but isn't very intuitive. GDB gives you
+perfect control over the execution of your code, but bad contextual
+information to let you know what control you should be exercising.</p>
+
+<p>Then came Python. Python's execution model contains excellent debugging
+hooks, and supplies PDB as a proof of concept. PDB is an interface that
+shares many similarities with GDB -- text mode, fantastic control, but
+very bad contextual information.</p>
+
+<p>So - enter <strong>bugjar</strong>. A graphical interface for debugging code.
+PDB, but with the context to help you step through code in a meaningful way.</p>
+
+
+<h2>
+<a name="quickstart" class="anchor" href="#quickstart"><span class="octicon octicon-link"></span></a>Quickstart</h2>
+
+<p>In your Python project, install bugjar, and then use it to run your
+  Python script:</p>
+
+<pre><code>$ pip install bugjar
+$ bugjar myscript.py arg1 arg2
+</code></pre>
+
+<p>This will start up a GUI displaying code, breakpoints, and so on,
+ready to execute your code. You can then step through your code,
+set new breakpoints, remove existing breakpoints, and inspect anything
+that the debugger can give you access to:
+<a href="static/images/screenshot.png"><img src="static/images/screenshot-mini.png" alt="Screenshot of bugjar GUI."></a>
+</p>
+
+<p>It's PDB, but with helpful context.</p>
+
+
+<h2>
+<a name="documentation" class="anchor" href="#documentation"><span class="octicon octicon-link"></span></a>Documentation</h2>
+
+<p>Documentation for bugjar can be found on <a href="http://bugjar.readthedocs.org">Read The Docs</a>.</p>
+
+<h2>
+<a name="community" class="anchor" href="#community"><span class="octicon octicon-link"></span></a>Community</h2>
+
+<p>Bugjar is part of the <a href="http://pybee.org">BeeWare suite</a>. You can talk to the community through:</p>
+<ul>
+<li><p><a href="https://twitter.com/pybeeware"><strong>@pybeeware</strong> on Twitter</a></p></li>
+<li><p>The <a href="https://groups.google.com/forum/#!forum/beeware-users">BeeWare Users Mailing list</a>, for questions about how to use the BeeWare suite.</p></li>
+<li><p>The <a href="https://groups.google.com/forum/#!forum/beeware-developers">BeeWare Developers Mailing list</a>, for discussing the development of new features in the BeeWare suite, and ideas for new tools for the suite.</p></li>
+</ul>
+
+<h2>
+<a name="contributing" class="anchor" href="#contributing"><span class="octicon octicon-link"></span></a>Contributing</h2>
+
+<p>If you experience problems with bugjar, you can <a href="https://github.com/pybee/bugjar/issues">log them on GitHub</a>. If you want to contribute code, please <a href="https://github.com/freakboy3742/bugjar">fork the code</a> and <a href="https://github.com/pybee/bugjar/pulls">submit a pull request</a>.</p>
+
+
       </section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/pybee">pybee</a></p>
