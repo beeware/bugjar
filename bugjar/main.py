@@ -151,3 +151,6 @@ def net():
 
     # Run the debugger
     net_run(options.hostname, options.port, filename, *options.args)
+
+if __name__ == '__main__':
+    local()
