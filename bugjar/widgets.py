@@ -151,7 +151,7 @@ class BreakpointView(Treeview):
 
             # Now insert a new node at the index that was found.
             self.insert(
-                '', index, filename,
+                '', index, self._nodify(filename),
                 text=self.normalizer(filename),
                 open=True,
                 tags=['file']
@@ -187,11 +187,23 @@ class BreakpointView(Treeview):
 
             # Now insert a new node at the index that was found.
             self.insert(
-                bp.filename, index, unicode(bp),
+                self._nodify(bp.filename), index, unicode(bp),
                 text=unicode(bp.line),
                 open=True,
                 tags=['breakpoint', tag]
             )
+
+    def _nodify(self, node):
+        "Escape any problem characters in a node name"
+        return node.replace('\\', '/')
+
+    def selection_set(self, node):
+        """Node names on the breakpoint tree are the filename.
+
+        On Windows, this requires escaping, because backslashes
+        in filenames cause problems with Tk.
+        """
+        Treeview.selection_set(self, self._nodify(node))
 
 
 class StackView(Treeview):
