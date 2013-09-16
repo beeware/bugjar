@@ -12,7 +12,7 @@ finally:
 
 required_pkgs = [
     'Pygments>=1.5',
-    'tkreadonly',
+    'tkreadonly>=0.5.2',
 ]
 if sys.version_info < (2, 7):
     required_pkgs.append('argparse')

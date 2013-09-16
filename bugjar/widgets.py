@@ -2,12 +2,15 @@ from ttk import *
 
 from tkreadonly import ReadOnlyCode
 
+from pygments.lexers import PythonLexer
+
 from bugjar.connection import ConnectionNotBootstrapped, UnknownBreakpoint
 
 
 class DebuggerCode(ReadOnlyCode):
     def __init__(self, *args, **kwargs):
         self.debugger = kwargs.pop('debugger')
+        kwargs['lexer'] = PythonLexer(stripnl=False)
         ReadOnlyCode.__init__(self, *args, **kwargs)
 
         # Set up styles for line numbers
