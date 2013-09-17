@@ -202,7 +202,7 @@ class Debugger(bdb.Bdb):
         if self._run_state == Debugger.STARTING:
             return
         frame.f_locals['__return__'] = return_value
-        self.output('return', retval=return_value)
+        self.output('return', retval=repr(return_value))
         self.interaction(frame, None)
 
     def user_exception(self, frame, exc_info):
