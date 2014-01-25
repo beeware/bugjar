@@ -22,6 +22,7 @@ import socket
 import sys
 from threading import Thread
 import traceback
+import types
 
 try:
     from Queue import Queue
@@ -116,6 +117,7 @@ class Debugger(bdb.Bdb):
         self.client = None
         self.command_thread = None
         self.commands = None
+        self.tree_checked = {}
 
     def output(self, event, **data):
         try:
@@ -142,14 +144,64 @@ class Debugger(bdb.Bdb):
         elif self.stack[3][0].f_code.co_filename == '<string>':
             str_index = 4
 
+        def output_data(obj, prefix=''):
+            result = {}
+            if isinstance(obj, dict):
+                k_v = obj.items()
+            elif hasattr(obj, '__dict__'):
+                k_v = obj.__dict__.items()
+            elif hasattr(obj, '__slots__'):
+                k_v = [(k, getattr(obj, k)) for k in obj.__slots__]
+            else:
+                k_v = enumerate(obj)
+
+            for k, v in k_v:
+                leaf = False
+                if isinstance(v, (types.MethodType, types.FunctionType)):
+                    v1 = repr(v)
+                    leaf = True
+                elif isinstance(v, dict):
+                    v1 = '< %s (%s items) >' % (v.__class__.__name__, len(v))
+                elif isinstance(v, (list, tuple, set)):
+                    v1 = '< %s (%s items) >' % (v.__class__.__name__, len(v))
+                elif hasattr(v, '__dict__'):
+                    v1 = repr(v)
+                elif hasattr(v, '__slots__'):
+                    v1 = repr(v)
+                else:
+                    v1 = repr(v)
+                    leaf = True
+                name = ''
+                on = int(self.tree_checked.get(prefix + unicode(k), False))
+                if on:
+                    val = output_data(v, prefix + k)
+                    # val[':name:'] = v1
+                    name = v1
+                else:
+                    val = v1
+                    # name = v1
+                result[k] = {
+                    'val': val,
+                    'leaf': leaf
+                }
+                if name:
+                    result[k]['nm'] = name
+                result[k]['on'] = on
+            # print result, 'result'
+            return result
+            
+
         stack_data = [
             (
                 line_no,
                 {
                     'filename': frame.f_code.co_filename,
-                    'locals': dict((k, repr(v)) for k, v in frame.f_locals.items()),
-                    'globals': dict((k, repr(v)) for k, v in frame.f_globals.items()),
-                    'builtins': dict((k, repr(v)) for k, v in frame.f_builtins.items()),
+                    'locals': output_data(frame.f_locals, prefix=':locals:'),
+                    'globals': output_data(frame.f_globals, prefix=':globals:'),
+                    'builtins': output_data(frame.f_builtins, prefix=':builtins:'),
+                    # 'locals': dict((k, repr(v)) for k, v in frame.f_locals.items()),
+                    # 'globals': dict((k, repr(v)) for k, v in frame.f_globals.items()),
+                    # 'builtins': dict((k, repr(v)) for k, v in frame.f_builtins.items()),
                     'restricted': frame.f_restricted,
                     'lasti': repr(frame.f_lasti),
                     'exc_type': repr(frame.f_exc_type),
@@ -160,6 +212,7 @@ class Debugger(bdb.Bdb):
             )
             for frame, line_no in self.stack[str_index:]
         ]
+        # print stack_data[0][1]['locals']
         self.output('stack', stack=stack_data)
 
     def forget(self):
@@ -239,8 +292,9 @@ class Debugger(bdb.Bdb):
                     except (ClientClose, Restart):
                         # Reraise any control exceptions
                         raise
-                    except Exception, e:
+                    except Exception, e: 
                         # print "Unknown problem with command %s: %s" % (command, e)
+                        traceback.print_exc()
                         self.output('error', message='Unknown problem with command %s: %s' % (command, e))
                 else:
                     # print "Unknown command %s" % command
@@ -488,6 +542,14 @@ class Debugger(bdb.Bdb):
         # print "Thread is dead"
         self.commands = None
         raise ClientClose
+
+    def do_toggle_inspector_branch(self, item):
+        self.tree_checked[item] = not self.tree_checked.get(item, False)
+        self.output_stack()
+    
+    # def do_uncheck_inspector_branch(self, item):
+    #     del self.tree_checked[item]
+    #     self.output_stack()
 
     # def do_args(self, arg):
     #     co = self.curframe.f_code
