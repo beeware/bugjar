@@ -1,21 +1,21 @@
 '''
 This is the main entry point for the Bugjar GUI.
 '''
-from Tkinter import *
-
 import argparse
 import os
 import subprocess
 import time
-
+import sys
 from bugjar import VERSION
-from bugjar.view import MainWindow
 from bugjar.connection import Debugger
 from bugjar.net import run as net_run
 
 
 def jar_run(debugger):
     # Set up the root Tk context
+    from Tkinter import Tk
+    from bugjar.view import MainWindow
+    # Dependency from Tkinter is needed to be only in client's code
     root = Tk()
 
     # Construct a window debugging the nominated program

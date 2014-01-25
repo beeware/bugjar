@@ -1,11 +1,13 @@
+import os
 from ttk import *
-
+from Tkinter import PhotoImage
 from tkreadonly import ReadOnlyCode
 
 from pygments.lexers import PythonLexer
 
 from bugjar.connection import ConnectionNotBootstrapped, UnknownBreakpoint
 
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class DebuggerCode(ReadOnlyCode):
     def __init__(self, *args, **kwargs):
@@ -254,8 +256,24 @@ class InspectorView(Treeview):
     def __init__(self, *args, **kwargs):
         # Only a single stack frame can be selected at a time.
         kwargs['selectmode'] = 'browse'
+        self.debugger = kwargs.pop('debugger')
         Treeview.__init__(self, *args, **kwargs)
 
+        self.unchecked_image = PhotoImage(
+            file=os.path.join(
+                THIS_DIR,
+                'pics',
+                'checkbox_unchecked.gif'
+            )
+        )
+        self.checked_image = PhotoImage(
+            file=os.path.join(
+                THIS_DIR,
+                'pics',
+                'checkbox_checked.gif'
+            )
+        )
+         
         self.locals = self.insert(
             '', 'end', ':builtins:',
             text='builtins',
@@ -273,18 +291,94 @@ class InspectorView(Treeview):
             text='locals',
             open=True,
         )
-
+        
+        self.bind("<Double-1>", self.cmd_double_click)
+        # self.bind('<<TreeviewClose>>', self.cmd_click)
+         
         self['columns'] = ('value',)
         self.column('#0', width=150, anchor='w')
         self.column('value', width=200, anchor='w')
         self.heading('#0', text='Name')
         self.heading('value', text='Value')
 
+    def cmd_double_click(self, event):
+        item = self.selection()[0]
+        # print item
+        # print item, 'item'
+        cur_image = self.item(item, option='image')
+        if not cur_image:
+            return
+        self.debugger.output('toggle_inspector_branch', item=item)
+        # print dir(item)
+
     def show_frame(self, frame):
         "Update the display of the stack frame"
         self.update_node(':builtins:', frame['builtins'])
         self.update_node(':globals:', frame['globals'])
         self.update_node(':locals:', frame['locals'])
+
+    def update_item(self, value, node_name, name):
+        """Update item of inspector view."""
+        leaf = value.get('leaf', False)
+        val = value.get('val')
+        nm = value.get('nm', val)
+        on = value.get('on', 0)
+        to_delete = not on
+        if leaf:  # no checkboxes for primitive types
+            image = None
+        else:
+            if on:
+                image = self.checked_image
+            else:
+                image = self.unchecked_image
+        kw = {}
+        if image:
+            kw['image'] = image
+        self.item(
+            node_name,
+            text=name,
+            values=(nm,),
+            **kw
+        )
+        if to_delete:
+            for child in self.get_children(node_name):
+                self.delete(child)
+        
+        if not leaf and isinstance(val, dict):
+            for k, v in val.items():
+                item_key = u'%s%s' % (node_name, k)
+                exists = self.exists(item_key)
+                if exists:
+                    if to_delete:
+                        self.delete(item_key)
+                    else:
+                        self.update_item(v, item_key, k)
+                else:
+                    self.insert_item(node_name, 'end', item_key, k, v)
+
+    def insert_item(self, parent, index, node_name, name, value):
+        if isinstance(value, dict):
+            leaf = value.get('leaf', False)
+            vl = value.get('val')
+        else:
+            vl = value
+            leaf = True
+
+        if leaf:
+            image = None
+        else:
+            image = self.unchecked_image
+        kw = {}
+        if image:
+            kw['image'] = image
+
+        self.insert(
+            parent, index, node_name,
+            text=name,
+            values=(vl,),
+            open=leaf,
+            **kw
+        )
 
     def update_node(self, parent, frame):
         # Retrieve the current stack list
@@ -298,20 +392,16 @@ class InspectorView(Treeview):
         display = 0
         index = 0
         variables = sorted(frame.items())
-
         while index < len(variables):
             name, value = variables[index]
             node_name = '%s%s' % (parent, name)
+        
             if display < len(displayed):
                 if node_name == displayed[display]:
                     # Name matches the expected index.
                     # Update the existing node value, and
                     # move to the next displayed index.
-                    self.item(
-                        node_name,
-                        text=name,
-                        values=(value,)
-                    )
+                    self.update_item(value, node_name, name)
                     index = index + 1
                     display = display + 1
                 elif node_name > displayed[display]:
@@ -325,20 +415,12 @@ class InspectorView(Treeview):
                     # The variable name will sort before the next
                     # displayed name. This means a new variable
                     # has entered scope and must be added.
-                    self.insert(
-                        parent, index, node_name,
-                        text=name,
-                        values=(value,)
-                    )
+                    self.insert_item(parent, index, node_name, name, value)
                     index = index + 1
             else:
                 # There are no more displayed nodes, but there are still
                 # variables in the frame; we add them all to the end
-                self.insert(
-                    parent, 'end', node_name,
-                    text=name,
-                    values=(value,)
-                )
+                self.insert_item(parent, 'end', node_name, name, value)
                 index = index + 1
 
         # Primary iteration has ended, which means we've run out of variables

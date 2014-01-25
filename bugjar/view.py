@@ -263,7 +263,7 @@ class MainWindow(object):
         self.inspector_frame = Frame(self.content)
         self.inspector_frame.grid(column=2, row=0, sticky=(N, S, E, W))
 
-        self.inspector = InspectorView(self.inspector_frame)
+        self.inspector = InspectorView(self.inspector_frame, debugger=self.debugger)
         self.inspector.grid(column=0, row=0, sticky=(N, S, E, W))
 
         # The tree's vertical scrollbar
