@@ -1,3 +1,4 @@
+from __future__ import print_function, unicode_literals
 import json
 import socket
 import time
@@ -21,13 +22,16 @@ class Breakpoint(object):
         self.temporary = temporary
         self.funcname = funcname
 
+    def __str__(self):
+        return str('%s:%s' % (self.filename, self.line))
+
     def __unicode__(self):
-        return u'%s:%s' % (self.filename, self.line)
+        return '%s:%s' % (self.filename, self.line)
 
 
 def command_buffer(debugger):
     "Buffer input from a socket, yielding complete command packets."
-    remainder = ''
+    remainder = b''
     while True:
         new_buffer = debugger.socket.recv(1024)
 
@@ -50,12 +54,13 @@ def command_buffer(debugger):
                 remainder = ''
             for message in messages:
                 # print "READ %s bytes" % len(message)
+                message = message.decode('utf8')
                 event, data = json.loads(message)
 
                 if hasattr(debugger, 'on_%s' % event):
                     getattr(debugger, 'on_%s' % event)(**data)
                 else:
-                    print "Unknown server event:", event
+                    print("Unknown server event:", event)
 
     # print "FINISH PROCESSING CLIENT COMMAND BUFFER"
 
@@ -63,7 +68,7 @@ def command_buffer(debugger):
 class Debugger(object):
     "A networked connection to a debugger session"
 
-    ETX = '\x03'
+    ETX = b'\x03'
 
     def __init__(self, host, port, proc=None):
         self.host = host
@@ -83,8 +88,8 @@ class Debugger(object):
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket.connect((self.host, self.port))
                 connected = True
-            except socket.error, e:
-                print "Waiting for connection...", e
+            except socket.error as e:
+                print("Waiting for connection...", e)
                 time.sleep(1.0)
 
         t = Thread(target=command_buffer, args=(self,))
@@ -109,11 +114,14 @@ class Debugger(object):
         "Send a single command packet to the debugger"
         try:
             # print "OUTPUT %s byte message" % len(json.dumps((event, data)) + Debugger.ETX)
-            self.socket.sendall(json.dumps((event, data)) + Debugger.ETX)
-        except socket.error, e:
-            print "CLIENT ERROR", e
-        except AttributeError, e:
-            print "No client yet", e
+            dumped = json.dumps((event, data))
+            if not isinstance(dumped, bytes):
+                dumped = dumped.encode('utf8')
+            self.socket.sendall(dumped + Debugger.ETX)
+        except socket.error as e:
+            print("CLIENT ERROR", e)
+        except AttributeError as e:
+            print("No client yet", e)
 
     #################################################################
     # Utilities for retrieving current breakpoints.

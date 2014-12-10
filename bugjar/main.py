@@ -1,12 +1,17 @@
 '''
 This is the main entry point for the Bugjar GUI.
 '''
-from Tkinter import *
-
+from __future__ import unicode_literals
 import argparse
 import os
 import subprocess
+import sys
 import time
+
+try:
+    from Tkinter import Tk
+except ImportError:
+    from tkinter import Tk  # Python 3.
 
 from bugjar import VERSION
 from bugjar.view import MainWindow
