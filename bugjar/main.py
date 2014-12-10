@@ -14,6 +14,12 @@ from bugjar.connection import Debugger
 from bugjar.net import run as net_run
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        super(ArgumentParser, self).__init__(*args, **kwargs)
+        self.add_argument('-v', '--version', action='version', version=VERSION)
+
+
 def jar_run(debugger):
     # Set up the root Tk context
     root = Tk()
@@ -30,9 +36,8 @@ def jar_run(debugger):
 
 def local():
     "Run a Bugjar session on a local process"
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description='Debug a python script with a graphical interface.',
-        version=VERSION
     )
 
     parser.add_argument(
@@ -79,9 +84,8 @@ def local():
 
 def jar():
     "Connect a Bugjar GUI to a remote headless session."
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description='Connect a Bugjar GUI session to a headless debugger.',
-        version=VERSION
     )
 
     parser.add_argument(
@@ -112,9 +116,8 @@ def jar():
 
 def net():
     "Create a headless Bugjar session."
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description='Run a script inside a headless Bugjar session.',
-        version=VERSION
     )
 
     parser.add_argument(
