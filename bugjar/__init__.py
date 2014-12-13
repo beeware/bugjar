@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 # Examples of valid version strings
 # NUM_VERSION = (0, 1, 3, 'dev')
 # NUM_VERSION = (0, 1, 3, ('a', 1))

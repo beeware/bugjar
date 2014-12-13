@@ -2,13 +2,20 @@
 
 This is the "View" of the MVC world.
 """
+
+from __future__ import unicode_literals
 import os
-from Tkinter import *
-from tkFont import *
-from ttk import *
-import tkMessageBox
-import tkFileDialog
 import webbrowser
+try:
+    from Tkinter import Menu, StringVar, N, S, E, W, HORIZONTAL, VERTICAL
+    from ttk import Button, Frame, Label, Notebook, PanedWindow, Scrollbar, Sizegrip
+    import tkMessageBox
+    import tkFileDialog
+except ImportError:
+    from tkinter import Menu, StringVar, N, S, E, W, HORIZONTAL, VERTICAL
+    from tkinter.ttk import Button, Frame, Label, Notebook, PanedWindow, Scrollbar, Sizegrip
+    from tkinter import messagebox as tkMessageBox, filedialog as tkFileDialog
+
 
 from bugjar import VERSION, NUM_VERSION
 from bugjar.widgets import DebuggerCode, BreakpointView, StackView, InspectorView
@@ -65,7 +72,7 @@ class MainWindow(object):
         self.root.geometry('1024x768')
 
         # Prevent the menus from having the empty tearoff entry
-        self.root.option_add('*tearOff', FALSE)
+        self.root.option_add('*tearOff', False)
         # Catch the close button
         self.root.protocol("WM_DELETE_WINDOW", self.cmd_quit)
         # Catch the "quit" event.
