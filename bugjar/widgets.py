@@ -1,10 +1,20 @@
-from ttk import *
+from __future__ import print_function, unicode_literals
+
+try:
+    from ttk import Treeview
+except ImportError:
+    from tkinter.ttk import Treeview
 
 from tkreadonly import ReadOnlyCode
 
 from pygments.lexers import PythonLexer
 
 from bugjar.connection import ConnectionNotBootstrapped, UnknownBreakpoint
+
+try:
+    unicode
+except NameError:
+    unicode = str   # Python 3.
 
 
 class DebuggerCode(ReadOnlyCode):
@@ -114,7 +124,7 @@ class DebuggerCode(ReadOnlyCode):
             # No breakpoint for this line; create one.
             self.debugger.create_breakpoint(self.filename, event.line)
         except ConnectionNotBootstrapped:
-            print "Connection not configured"
+            print("Connection not configured")
 
     def on_name_double_click(self, event):
         "When a code variable is clicked on... do something"

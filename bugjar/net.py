@@ -13,6 +13,7 @@ License terms for the original PDB code can be found here:
     http://docs.python.org/2/license.html
 """
 
+from __future__ import print_function, unicode_literals
 import bdb
 import linecache
 import json
@@ -65,7 +66,7 @@ def find_function(funcname, filename):
 
 def command_buffer(debugger):
     "Buffer input from a socket, yielding complete command packets."
-    remainder = ''
+    remainder = b''
     while True:
         new_buffer = debugger.client.recv(1024)
 
@@ -85,14 +86,15 @@ def command_buffer(debugger):
             if terminator is None:
                 remainder = messages.pop()
             else:
-                remainder = ''
+                remainder = b''
             for message in messages:
                 # print "READ %s bytes" % len(message)
-                command, args = json.loads(message)
+                # command, args = json.loads(message)
+                message = message.decode('utf8')
                 try:
                     debugger.commands.put(json.loads(message))
                 except ValueError:
-                    print "Invalid command: %s" % message
+                    print("Invalid command: %s" % message)
 
     # print "FINISH PROCESSING SERVER COMMAND BUFFER"
     debugger.commands.put(('close', {}))
@@ -103,7 +105,7 @@ class Debugger(bdb.Bdb):
     STARTING = 1
     STARTED = 2
 
-    ETX = '\x03'
+    ETX = b'\x03'
 
     def __init__(self, socket, host, port, skip=None):
         bdb.Bdb.__init__(self, skip=skip)
@@ -121,8 +123,11 @@ class Debugger(bdb.Bdb):
         try:
             # print "OUTPUT %s byte %s message" % (len(json.dumps((event, data)) + Debugger.ETX), event)
             # print json.dumps((event, data))
-            self.client.sendall(json.dumps((event, data)) + Debugger.ETX)
-        except socket.error, e:
+            dumped = json.dumps((event, data))
+            if not isinstance(dumped, bytes):
+                dumped = dumped.encode('utf8')
+            self.client.sendall(dumped + Debugger.ETX)
+        except socket.error:
             pass
             # print "CLIENT ERROR", e
         except AttributeError:
@@ -150,11 +155,11 @@ class Debugger(bdb.Bdb):
                     'locals': dict((k, repr(v)) for k, v in frame.f_locals.items()),
                     'globals': dict((k, repr(v)) for k, v in frame.f_globals.items()),
                     'builtins': dict((k, repr(v)) for k, v in frame.f_builtins.items()),
-                    'restricted': frame.f_restricted,
+                    'restricted': getattr(frame, 'f_restricted', ''),
                     'lasti': repr(frame.f_lasti),
-                    'exc_type': repr(frame.f_exc_type),
-                    'exc_value': repr(frame.f_exc_value),
-                    'exc_traceback': repr(frame.f_exc_traceback),
+                    'exc_type': repr(getattr(frame, 'f_exc_type', '')),
+                    'exc_value': repr(getattr(frame, 'f_exc_value', '')),
+                    'exc_traceback': repr(getattr(frame, 'f_exc_traceback', '')),
                     'current': frame is self.curframe,
                 }
             )
@@ -239,7 +244,7 @@ class Debugger(bdb.Bdb):
                     except (ClientClose, Restart):
                         # Reraise any control exceptions
                         raise
-                    except Exception, e:
+                    except Exception as e:
                         # print "Unknown problem with command %s: %s" % (command, e)
                         self.output('error', message='Unknown problem with command %s: %s' % (command, e))
                 else:
@@ -248,10 +253,10 @@ class Debugger(bdb.Bdb):
 
             except (socket.error, AttributeError, ClientClose):
                 # Problem with connection; look for new client
-                print "Listening on %s:%s for a bugjar client" % (self.host, self.port)
+                print("Listening on %s:%s for a bugjar client" % (self.host, self.port))
                 client, addr = self.socket.accept()
 
-                print "Got connection from", client.getpeername()
+                print("Got connection from", client.getpeername())
                 self.client = client
 
                 # Start the command queue
@@ -549,7 +554,10 @@ class Debugger(bdb.Bdb):
         self._run_state = Debugger.STARTING
         self.mainpyfile = self.canonic(filename)
         self._user_requested_quit = False
-        self.run('execfile(%r)' % filename)
+        self.run('f = open("{filename}", "rb");'
+                 'code = compile(f.read(), "{filename}", "exec");'
+                 'exec(code);'
+                 'f.close();'.format(filename=filename))
 
 
 def run(hostname, port, filename, *args):
@@ -580,18 +588,18 @@ def run(hostname, port, filename, *args):
 
             debugger.output('restart')
         except Restart:
-            print "Restarting", filename, "with arguments:"
-            print "\t" + " ".join(sys.argv[1:])
+            print("Restarting", filename, "with arguments:")
+            print("\t" + " ".join(sys.argv[1:]))
         except KeyboardInterrupt:
-            print "Keyboard interrupt"
+            print("Keyboard interrupt")
             debugger.client = None
             break
         except SystemExit:
-            print "System exit"
+            print("System exit")
             debugger.client = None
             break
         except socket.error:
-            print "Controller client disappeared; can't recover"
+            print("Controller client disappeared; can't recover")
             debugger.client = None
             break
         except:
