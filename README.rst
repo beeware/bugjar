@@ -1,5 +1,27 @@
+.. image:: http://pybee.org/project/projects/tools/bugjar/bugjar.png
+    :width: 72px
+    :target: https://pybee.org/bugjar
+
 Bugjar
 ======
+
+.. image:: https://img.shields.io/pypi/pyversions/bugjar.svg
+    :target: https://pypi.python.org/pypi/bugjar
+
+.. image:: https://img.shields.io/pypi/v/bugjar.svg
+    :target: https://pypi.python.org/pypi/bugjar
+
+.. image:: https://img.shields.io/pypi/status/bugjar.svg
+    :target: https://pypi.python.org/pypi/bugjar
+
+.. image:: https://img.shields.io/pypi/l/bugjar.svg
+    :target: https://github.com/pybee/bugjar/blob/master/LICENSE
+
+.. image:: https://travis-ci.org/pybee/bugjar.svg?branch=master
+    :target: https://travis-ci.org/pybee/bugjar
+
+.. image:: https://badges.gitter.im/pybee/general.svg
+    :target: https://gitter.im/pybee/general
 
 Bugjar is part of the `BeeWare suite`_. The project website is
 `http://pybee.org/bugjar`_.
@@ -85,11 +107,12 @@ Community
 
 Bugjar is part of the `BeeWare suite`_. You can talk to the community through:
 
- * `@pybeeware on Twitter`_
+* `@pybeeware on Twitter`_
 
- * The `BeeWare Users Mailing list`_, for questions about how to use the BeeWare suite.
+* The `pybee/general`_ channel on Gitter.
 
- * The `BeeWare Developers Mailing list`_, for discussing the development of new features in the BeeWare suite, and ideas for new tools for the suite.
+We foster a welcoming and respectful community as described in our
+`BeeWare Community Code of Conduct`_.
 
 Contributing
 ------------
@@ -98,8 +121,8 @@ If you experience problems with bugjar, `log them on GitHub`_. If you want to co
 
 .. _Read The Docs: http://bugjar.readthedocs.org
 .. _@pybeeware on Twitter: https://twitter.com/pybeeware
-.. _BeeWare Users Mailing list: https://groups.google.com/forum/#!forum/beeware-users
-.. _BeeWare Developers Mailing list: https://groups.google.com/forum/#!forum/beeware-developers
+.. _pybee/general: https://gitter.im/pybee/general
+.. _BeeWare Community Code of Conduct: http://pybee.org/community/behavior/
 .. _log them on Github: https://github.com/pybee/bugjar/issues
 .. _fork the code: https://github.com/pybee/bugjar
 .. _submit a pull request: https://github.com/pybee/bugjar/pulls
