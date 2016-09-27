@@ -1,7 +1,7 @@
 Headless mode
 =============
 
-Bugjar can also operate in a headless mode. This can be use to debug processes
+Bugjar can also operate in a headless mode. This can be used to debug processes
 running on a remote machine (although it also works on local machines).
 
 In headless mode, Bugjar is split into two parts:

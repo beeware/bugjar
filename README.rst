@@ -119,7 +119,7 @@ Contributing
 
 If you experience problems with bugjar, `log them on GitHub`_. If you want to contribute code, please `fork the code`_ and `submit a pull request`_.
 
-.. _Read The Docs: http://bugjar.readthedocs.org
+.. _Read The Docs: https://bugjar.readthedocs.io
 .. _@pybeeware on Twitter: https://twitter.com/pybeeware
 .. _pybee/general: https://gitter.im/pybee/general
 .. _BeeWare Community Code of Conduct: http://pybee.org/community/behavior/
