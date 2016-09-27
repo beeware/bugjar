@@ -42,14 +42,15 @@ very bad contextual information.
 So - enter ``bugjar``. A graphical interface for debugging code.
 PDB, but with the context to help you step through code in a meaningful way.
 
+
 Getting started
 ---------------
 
-Bugjar can be installed with pip:
+Bugjar can be installed with pip::
 
     $ pip install bugjar
 
-You can then debug a Python script by typing the following at a shell prompt:
+You can then debug a Python script by typing the following at a shell prompt::
 
     $ bugjar myscript.py arg1 arg2
 
@@ -111,9 +112,11 @@ We foster a welcoming and respectful community as described in our
 Contributing
 ------------
 
-If you experience problems with bugjar, `log them on GitHub`_. If you want to contribute code, please `fork the code`_ and `submit a pull request`_.
+If you experience problems with bugjar, `log them on GitHub`_. If you want to
+contribute code, please `fork the code`_ and `submit a pull request`_.
 
 .. _Read The Docs: https://bugjar.readthedocs.io
+.. _BeeWare suite: http://pybee.org/
 .. _@pybeeware on Twitter: https://twitter.com/pybeeware
 .. _pybee/general: https://gitter.im/pybee/general
 .. _BeeWare Community Code of Conduct: http://pybee.org/community/behavior/
