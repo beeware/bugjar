@@ -23,9 +23,6 @@ Bugjar
 .. image:: https://badges.gitter.im/pybee/general.svg
     :target: https://gitter.im/pybee/general
 
-Bugjar is part of the `BeeWare suite`_. The project website is
-`http://pybee.org/bugjar`_.
-
 Anyone who learned to code in the mid to late 80s probably spent some
 time with a Borland compiler -- probably either Turbo Pascal or Turbo C.
 One of the best features of the Turbo compilers was their IDE -- and
@@ -44,9 +41,6 @@ very bad contextual information.
 
 So - enter ``bugjar``. A graphical interface for debugging code.
 PDB, but with the context to help you step through code in a meaningful way.
-
-.. _BeeWare suite: http://pybee.org/
-.. _http://pybee.org/bugjar: http://pybee.org/bugjar
 
 Getting started
 ---------------
