@@ -1,6 +1,6 @@
-.. image:: http://pybee.org/project/projects/tools/bugjar/bugjar.png
+.. image:: https://beeware.org/project/projects/tools/bugjar/bugjar.png
     :width: 72px
-    :target: https://pybee.org/bugjar
+    :target: https://beeware.org/bugjar
 
 Bugjar
 ======
