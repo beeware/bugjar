@@ -17,12 +17,14 @@ Bugjar
 .. image:: https://img.shields.io/pypi/l/bugjar.svg
     :target: https://github.com/pybee/bugjar/blob/master/LICENSE
 
-.. image:: https://travis-ci.org/pybee/bugjar.svg?branch=master
-    :target: https://travis-ci.org/pybee/bugjar
+.. image:: https://github.com/beeware/bugjar/workflows/CI/badge.svg?branch=main
+   :target: https://github.com/beeware/bugjar/actions
+   :alt: Build Status
 
-.. image:: https://badges.gitter.im/pybee/general.svg
-    :target: https://gitter.im/pybee/general
-
+.. image:: https://img.shields.io/discord/836455665257021440?label=Discord%20Chat&logo=discord&style=plastic
+   :target: https://beeware.org/bee/chat/
+   :alt: Discord server
+   
 Anyone who learned to code in the mid to late 80s probably spent some
 time with a Borland compiler -- probably either Turbo Pascal or Turbo C.
 One of the best features of the Turbo compilers was their IDE -- and
@@ -104,7 +106,7 @@ Bugjar is part of the `BeeWare suite`_. You can talk to the community through:
 
 * `@pybeeware on Twitter`_
 
-* The `pybee/general`_ channel on Gitter.
+* `Discord <https://beeware.org/bee/chat/>`__
 
 We foster a welcoming and respectful community as described in our
 `BeeWare Community Code of Conduct`_.
@@ -116,10 +118,9 @@ If you experience problems with bugjar, `log them on GitHub`_. If you want to
 contribute code, please `fork the code`_ and `submit a pull request`_.
 
 .. _Read The Docs: https://bugjar.readthedocs.io
-.. _BeeWare suite: http://pybee.org/
+.. _BeeWare suite: https://beeware.org/
 .. _@pybeeware on Twitter: https://twitter.com/pybeeware
-.. _pybee/general: https://gitter.im/pybee/general
-.. _BeeWare Community Code of Conduct: http://pybee.org/community/behavior/
-.. _log them on Github: https://github.com/pybee/bugjar/issues
-.. _fork the code: https://github.com/pybee/bugjar
-.. _submit a pull request: https://github.com/pybee/bugjar/pulls
+.. _BeeWare Community Code of Conduct: https://beeware.org/community/behavior/
+.. _log them on Github: https://github.com/beeware/bugjar/issues
+.. _fork the code: https://github.com/beeware/bugjar
+.. _submit a pull request: https://github.com/beeware/bugjar/pulls
