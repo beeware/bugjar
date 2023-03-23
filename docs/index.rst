@@ -85,17 +85,16 @@ Community
 
 Bugjar is part of the `BeeWare suite`_. You can talk to the community through:
 
- * `@pybeeware on Twitter`_
+* `@beeware@fosstodon.org on Mastodon`_
+* `Discord`_
 
- * The `BeeWare Users Mailing list`_, for questions about how to use the BeeWare suite.
+We foster a welcoming and respectful community as described in our
+`BeeWare Community Code of Conduct`_.
 
- * The `BeeWare Developers Mailing list`_, for discussing the development of new features in the BeeWare suite, and ideas for new tools for the suite.
-
-.. _Read The Docs: https://bugjar.readthedocs.io
-.. _@pybeeware on Twitter: https://twitter.com/pybeeware
-.. _BeeWare Users Mailing list: https://groups.google.com/forum/#!forum/beeware-users
-.. _BeeWare Developers Mailing list: https://groups.google.com/forum/#!forum/beeware-developers
-
+.. _BeeWare suite: https://beeware.org/
+.. _@beeware@fosstodon.org on Mastodon: https://fosstodon.org/@beeware
+.. _Discord: https://beeware.org/bee/chat/
+.. _BeeWare Community Code of Conduct: http://beeware.org/community/behavior/
 
 Contents:
 
