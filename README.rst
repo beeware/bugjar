@@ -99,17 +99,23 @@ Documentation
 
 Documentation for bugjar can be found on `Read The Docs`_.
 
+.. _Read The Docs: https://bugjar.readthedocs.io
+
 Community
 ---------
 
 Bugjar is part of the `BeeWare suite`_. You can talk to the community through:
 
-* `@pybeeware on Twitter`_
-
-* `Discord <https://beeware.org/bee/chat/>`__
+* `@beeware@fosstodon.org on Mastodon`_
+* `Discord`_
 
 We foster a welcoming and respectful community as described in our
 `BeeWare Community Code of Conduct`_.
+
+.. _BeeWare suite: https://beeware.org/
+.. _@beeware@fosstodon.org on Mastodon: https://fosstodon.org/@beeware
+.. _Discord: https://beeware.org/bee/chat/
+.. _BeeWare Community Code of Conduct: http://beeware.org/community/behavior/
 
 Contributing
 ------------
@@ -117,10 +123,6 @@ Contributing
 If you experience problems with bugjar, `log them on GitHub`_. If you want to
 contribute code, please `fork the code`_ and `submit a pull request`_.
 
-.. _Read The Docs: https://bugjar.readthedocs.io
-.. _BeeWare suite: https://beeware.org/
-.. _@pybeeware on Twitter: https://twitter.com/pybeeware
-.. _BeeWare Community Code of Conduct: https://beeware.org/community/behavior/
 .. _log them on Github: https://github.com/beeware/bugjar/issues
 .. _fork the code: https://github.com/beeware/bugjar
 .. _submit a pull request: https://github.com/beeware/bugjar/pulls
