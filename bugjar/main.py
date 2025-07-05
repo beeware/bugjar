@@ -10,7 +10,7 @@ import time
 
 try:
     from Tkinter import Tk
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     from tkinter import Tk  # Python 3.
 
 from bugjar import VERSION
