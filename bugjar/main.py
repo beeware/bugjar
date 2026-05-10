@@ -69,7 +69,7 @@ def local():
 
     # Start the program to be debugged
     proc = subprocess.Popen(
-        ["bugjar-net", options.filename] + options.args,
+        ["bugjar-net", "-p", str(options.port), options.filename] + options.args,
         stdin=None,
         stdout=None,
         stderr=None,
