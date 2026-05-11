@@ -575,7 +575,7 @@ def run(hostname, port, filename, *args):
     s.bind((hostname, port))
     s.listen(1)
 
-    debugger = Debugger(s, hostname, port)
+    debugger = Debugger(s, host=hostname, port=port)
 
     while True:
         try:
